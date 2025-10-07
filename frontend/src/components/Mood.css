@@ -1,0 +1,86 @@
+.mood {
+  background-color: #f6f3f7;
+  padding: 20px;
+  max-width: 800px;
+  margin: 0 auto;
+  color: #333;
+}
+
+.mood-selection, .playlist-section {
+  margin-bottom: 40px;
+}
+
+.mood-selection h2, .playlist-section h2 {
+  font-size: 1.2em;
+  color: #a182cd;
+  margin-bottom: 15px;
+  text-align: left;
+}
+
+.mood-buttons {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 15px;
+  justify-content: center;
+}
+
+.mood-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 15px;
+  color: #333;
+  text-decoration: none;
+  font-weight: bold;
+  border-radius: 8px;
+  transition: transform 0.2s, opacity 0.2s;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  border: none;
+  cursor: pointer; 
+}
+
+.mood-button:hover {
+  transform: scale(1.05);
+  opacity: 0.9;
+}
+
+.mood-button:active {
+  transform: scale(0.95);
+}
+
+.playlist-cards {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 15px;
+}
+
+.playlist-card {
+  background-color: #fff;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.card-image {
+  height: 100px;
+  background-color: #ccc;
+  border-bottom: 1px solid #eee;
+}
+
+.card-content {
+  padding: 10px;
+}
+
+.card-content h3 {
+  font-size: 1em;
+  margin: 0 0 5px 0;
+  color: #333;
+}
+
+.card-content p {
+  font-size: 0.9em;
+  color: #666;
+  margin: 0;
+}

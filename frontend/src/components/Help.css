@@ -8,19 +8,13 @@
 
 .help h1 {
   font-size: 1.5em;
-  text-align: center;
+  text-align: left;
   color: #a182cd;
   margin-bottom: 20px;
 }
 
 .faq-section {
   margin-bottom: 40px;
-}
-
-.faq-section h2 {
-  font-size: 1.2em;
-  color: #a182cd;
-  margin-bottom: 15px;
 }
 
 .faq-item {
