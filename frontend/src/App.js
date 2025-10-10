@@ -10,6 +10,8 @@ import Workload from './components/Workload';
 import FocusLevel from './components/FocusLevel';
 import Help from './components/Help';
 import Login from './components/Login';
+// logo lives in the public folder; reference it with an absolute path
+const logoPath = '/Logo.png';
 
 function App() {
   return (
@@ -17,7 +19,12 @@ function App() {
       <div className="app">
         <nav className="navbar">
           <ul className="nav-links">
-            <li><NavLink to="/" className={({ isActive }) => isActive ? "nav-link active" : "nav-link"}>🎵 logo placeholder</NavLink></li>
+            {/* <li><NavLink to="/" className={({ isActive }) => isActive ? "nav-link active" : "nav-link"}>🎵 logo placeholder</NavLink></li> */}
+            <li className="logo-item">
+              <NavLink to="/" className={({ isActive }) => isActive ? "nav-link active logo-link" : "nav-link logo-link"}>
+                <img src={logoPath} alt="StudySound logo" className="logo" />
+              </NavLink>
+            </li>
             <li><NavLink to="/activity" className={({ isActive }) => isActive ? "nav-link active" : "nav-link"}>Activity</NavLink></li>
             <li><NavLink to="/mood" className={({ isActive }) => isActive ? "nav-link active" : "nav-link"}>Mood</NavLink></li>
             <li><NavLink to="/workload" className={({ isActive }) => isActive ? "nav-link active" : "nav-link"}>Workload</NavLink></li>
