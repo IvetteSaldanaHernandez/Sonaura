@@ -16,7 +16,6 @@ const FocusLevel = () => {
 
   return (
     <div className="focus-level">
-      <h1>Focus Level</h1>
       <section className="focus-selection">
         <div className="hours-selection">
           <h2>How many hours do you plan to study?</h2>
