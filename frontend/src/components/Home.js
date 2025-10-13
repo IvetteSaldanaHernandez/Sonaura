@@ -5,6 +5,7 @@ import { NavLink } from 'react-router-dom';
 const Home = () => {
   return (
     <div className="home">
+      <h2>Sonaura</h2>
       <h1>"Personalized study playlists for every mood, workload, and focus level."</h1>
 
       <section className="about">

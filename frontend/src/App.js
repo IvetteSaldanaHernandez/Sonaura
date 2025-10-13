@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, NavLink } from 'react-router-dom';
 import './App.css';
 
@@ -10,9 +10,19 @@ import Workload from './components/Workload';
 import FocusLevel from './components/FocusLevel';
 import Help from './components/Help';
 import Login from './components/Login';
+// import Signup from './components/Signup';
+import Profile from './components/Profile';
+
 const logoPath = '/Logo.png';
 
 function App() {
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+
+  const handleLogout = () => {
+    setIsAuthenticated(false);
+    // Add logout API call here if needed
+  };
+
   return (
     <Router>
       <div className="app">
@@ -24,12 +34,24 @@ function App() {
                 <img src={logoPath} alt="StudySound logo" className="logo" />
               </NavLink>
             </li>
-            <li><NavLink to="/activity" className={({ isActive }) => isActive ? "nav-link active" : "nav-link"}>Activity</NavLink></li>
-            <li><NavLink to="/mood" className={({ isActive }) => isActive ? "nav-link active" : "nav-link"}>Mood</NavLink></li>
-            <li><NavLink to="/workload" className={({ isActive }) => isActive ? "nav-link active" : "nav-link"}>Workload</NavLink></li>
-            <li><NavLink to="/focus-level" className={({ isActive }) => isActive ? "nav-link active" : "nav-link"}>Focus Level</NavLink></li>
-            <li><NavLink to="/help" className={({ isActive }) => isActive ? "nav-link active" : "nav-link"}>Help</NavLink></li>
-            <li><NavLink to="/login" className={({ isActive }) => isActive ? "nav-link active" : "nav-link"}>Log In</NavLink></li>
+            {!isAuthenticated ? (
+              <>
+                <li><NavLink to="/help" className={({ isActive }) => isActive ? "nav-link active" : "nav-link"}>Help</NavLink></li>
+                <li><NavLink to="/login" className={({ isActive }) => isActive ? "nav-link active" : "nav-link"}>Log In</NavLink></li>
+                {/* <li><NavLink to="/signup" className={({ isActive }) => isActive ? "nav-link active" : "nav-link"}>Sign Up</NavLink></li> */}
+              </>
+            ) : (
+              <>
+                <li><NavLink to="/activity" className={({ isActive }) => isActive ? "nav-link active" : "nav-link"}>Activity</NavLink></li>
+                <li><NavLink to="/mood" className={({ isActive }) => isActive ? "nav-link active" : "nav-link"}>Mood</NavLink></li>
+                <li><NavLink to="/workload" className={({ isActive }) => isActive ? "nav-link active" : "nav-link"}>Workload</NavLink></li>
+                <li><NavLink to="/focus-level" className={({ isActive }) => isActive ? "nav-link active" : "nav-link"}>Focus Level</NavLink></li>
+                <li><NavLink to="/help" className={({ isActive }) => isActive ? "nav-link active" : "nav-link"}>Help</NavLink></li>
+                <li><NavLink to="/profile" className={({ isActive }) => isActive ? "nav-link active" : "nav-link"}>Profile</NavLink></li>
+                {/* <li><button onClick={handleLogout} className="nav-link logout">Log Out</button></li> */}
+                <li><NavLink to="/" onClick={handleLogout} className={({ isActive }) => isActive ? "nav-link active logout" : "nav-link logout"}>Log Out</NavLink></li>
+              </>
+            )}
           </ul>
         </nav>
         <main>
@@ -40,7 +62,9 @@ function App() {
             <Route path="/workload" element={<Workload />} />
             <Route path="/focus-level" element={<FocusLevel />} />
             <Route path="/help" element={<Help />} />
-            <Route path="/login" element={<Login />} />
+            <Route path="/login" element={<Login setIsAuthenticated={setIsAuthenticated} />} />
+            {/* <Route path="/signup" element={<Signup setIsAuthenticated={setIsAuthenticated} />} /> */}
+            <Route path="/profile" element={<Profile />} />
           </Routes>
         </main>
       </div>

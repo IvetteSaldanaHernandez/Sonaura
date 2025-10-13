@@ -1,0 +1,44 @@
+/* src/components/Profile.css */
+.profile {
+  background-color: #f6f3f7;
+  padding: 20px;
+  max-width: 600px;
+  margin: 0 auto;
+  color: #333;
+}
+
+.profile-details {
+  background-color: #fff;
+  padding: 15px;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  margin-bottom: 20px;
+}
+
+.profile-details p {
+  font-size: 1em;
+  margin: 5px 0;
+}
+
+.profile-details strong {
+  color: #a182cd;
+}
+
+.spotify-connect {
+  display: block;
+  width: 100%;
+  max-width: 200px;
+  padding: 10px;
+  font-size: 1em;
+  background-color: #1db954; /* Spotify green */
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  margin: 0 auto;
+}
+
+.spotify-connect:hover {
+  background-color: #1ed760;
+}
