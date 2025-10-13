@@ -10,7 +10,6 @@ import Workload from './components/Workload';
 import FocusLevel from './components/FocusLevel';
 import Help from './components/Help';
 import Login from './components/Login';
-// logo lives in the public folder; reference it with an absolute path
 const logoPath = '/Logo.png';
 
 function App() {
