@@ -42,6 +42,18 @@ html, body {
   padding: 0;
 }
 
+.logo-item {
+  display: flex;
+  align-items: center;
+  /* margin-right: 10px; */
+}
+
+.logo {
+  height: 25px; /*36*/
+  width: auto;
+  display: block;
+}
+
 .nav-link {
   padding: 10px 15px;
   text-decoration: none;
