@@ -16,8 +16,28 @@ const Mood = () => {
     { name: 'sad', color: '#999999' }
   ];
 
+  const dummyPlaylists = {
+    love: [
+      { title: 'Romantic Ballads', artist: 'Love Songs Collective' },
+      { title: 'Heartfelt Melodies', artist: 'Romantic Hits' },
+      { title: 'Sweet Serenades', artist: 'Soft Pop' },
+      { title: 'Love in the Air', artist: 'Acoustic Love' }
+    ],
+    confident: [
+      { title: 'Power Anthems', artist: 'Motivational Beats' },
+      { title: 'Bold Tracks', artist: 'Uplifting Pop' },
+      { title: 'Confidence Boost', artist: 'Epic Instrumentals' },
+      { title: 'Strong Vibes', artist: 'Rock Classics' }
+    ]
+  };
+
   const handleMoodClick = (mood) => {
     setSelectedMood(mood); // set mood
+  };
+
+  const getMoodColor = (moodName) => {
+    const mood = moods.find(m => m.name === moodName);
+    return mood ? mood.color : '#ccc'; // Default to white if mood not found
   };
 
   return (
@@ -43,7 +63,7 @@ const Mood = () => {
       {selectedMood && (
         <section className="playlist-section">
           <h2>Playlists based on your mood</h2>
-          <div className="playlist-cards">
+          {/* <div className="playlist-cards">
             <div className="playlist-card">
               <div className="card-image"></div>
               <div className="card-content">
@@ -72,6 +92,17 @@ const Mood = () => {
                 <p>Artist Placeholder</p>
               </div>
             </div>
+          </div> */}
+          <div className="playlist-cards">
+            {dummyPlaylists[selectedMood].map((playlist, index) => (
+              <div key={index} className="playlist-card">
+                <div className="card-image" style={{ backgroundColor: getMoodColor(selectedMood) }}></div>
+                <div className="card-content">
+                  <h3>{playlist.title}</h3>
+                  <p>{playlist.artist}</p>
+                </div>
+              </div>
+            ))}
           </div>
         </section>
       )}

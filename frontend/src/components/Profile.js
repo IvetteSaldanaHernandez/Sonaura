@@ -3,7 +3,7 @@ import './Profile.css';
 
 const Profile = () => {
   const user = {
-    username: 'User123' // Simulated user data; replace with actual data from auth
+    username: 'ivette-test' // Simulated user data; replace with actual data from auth
   };
 
   const handleSpotifyConnect = () => {
