@@ -12,6 +12,7 @@ import Help from './components/Help';
 import Login from './components/Login';
 // import Signup from './components/Signup';
 import Profile from './components/Profile';
+import Callback from './components/Callback';
 
 const logoPath = '/Logo.png';
 
@@ -20,7 +21,9 @@ function App() {
 
   const handleLogout = () => {
     setIsAuthenticated(false);
-    // Add logout API call here if needed
+    localStorage.removeItem('jwt_token');
+    localStorage.removeItem('spotify_token');
+    localStorage.removeItem('spotify_refresh_token');
   };
 
   return (
@@ -65,6 +68,7 @@ function App() {
             <Route path="/login" element={<Login setIsAuthenticated={setIsAuthenticated} />} />
             {/* <Route path="/signup" element={<Signup setIsAuthenticated={setIsAuthenticated} />} /> */}
             <Route path="/profile" element={<Profile />} />
+            <Route path="/callback" element={<Callback />} />
           </Routes>
         </main>
       </div>
