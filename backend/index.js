@@ -28,10 +28,64 @@ const spotifyApi = new SpotifyWebAPI({
 // user model
 const User = require('./models/User');
 
+// middleware to verify JWT and set Spotify access token
+const authMiddleware = async (req, res, next) => {
+  const token = req.headers.authorization?.split(' ')[1];
+  if (!token) return res.status(401).json({ error: 'No token provided' });
+
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const user = await User.findById(decoded.userId);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    if (!user.spotifyToken) return res.status(403).json({ error: 'Spotify not connected' });
+
+    spotifyApi.setAccessToken(user.spotifyToken);
+
+    try {
+      await spotifyApi.getMe(); // test token
+    } catch (apiErr) {
+      if (apiErr.statusCode === 401) {
+        console.log('Token expired – refreshing...');
+        await refreshAccessToken(user);
+      } else {
+        throw apiErr;
+      }
+    }
+
+    req.user = user;
+    next();
+  } catch (err) {
+    res.status(401).json({ error: 'Invalid token' });
+  }
+};
+
+// REFRESH TOKEN IF EXPIRED
+const refreshAccessToken = async (user) => {
+  try {
+    spotifyApi.setRefreshToken(user.spotifyRefreshToken);
+    const data = await spotifyApi.refreshAccessToken();
+    const newToken = data.body.access_token;
+
+    user.spotifyToken = newToken;
+    await user.save();
+
+    spotifyApi.setAccessToken(newToken);
+    return newToken;
+  } catch (err) {
+    console.error('Token refresh failed:', err);
+    throw err;
+  }
+};
+
 // routes
 // get spotify login URL
 app.get('/api/spotify/login', (req, res) => {
-  const scopes = ['user-read-private', 'user-read-email', 'playlist-read-private'];
+  const scopes = ['user-read-private', 
+                  'user-read-email', 
+                  'playlist-read-private',
+                  'user-read-recently-played',
+                  'user-library-read',
+                  'user-top-read'];
   const authorizeURL = spotifyApi.createAuthorizeURL(scopes, 'some-state');
   res.json({ url: authorizeURL });
 });
@@ -64,54 +118,26 @@ app.get('/api/spotify/callback', async (req, res) => {
     }
 
     // send tokens to frontend
-    const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, { expiresIn: '1h' });
-    res.json({ access_token, refresh_token });
+    const jwtToken = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, { expiresIn: '1h' });
+    res.json({ token: jwtToken, access_token, refresh_token });
   } catch (err) {
     console.error('Spotify auth error:', err);
     res.status(400).json({ error: err.message });
   }
 });
 
-// get reccommendations
-app.post('/api/spotify/recommend', async (req, res) => {
-  const { access_token, mood = 'focus', workload = 'medium' } = req.body;
+app.get('/api/spotify/liked-albums', authMiddleware, async (req, res) => {
   try {
-    spotifyApi.setAccessToken(access_token);
-    let seed_genres = 'lofi,ambient';
-    let target_energy = 0.4;
-    let target_valence = 0.5;
-    // change based on user input
-    if (mood === 'energetic') {
-      target_energy = 0.8;
-      target_valence = 0.7;
-      seed_genres = 'pop,upbeat';
-    } else if (workload === 'high') {
-      target_energy = 0.6;
-      seed_genres = 'classical,focus';
-    }
-    const response = await spotifyApi.getRecommendations({
-      seed_genres,
-      limit: 10,
-      target_energy,
-      target_valence
-    });
-    res.json(response.body);
+    const data = await spotifyApi.getMySavedAlbums({ limit: 4 });
+    const albums = data.body.items.map(item => ({
+      title: item.album.name,
+      artist: item.album.artists.map(a => a.name).join(', '),
+      image: item.album.images[0]?.url || ''
+    }));
+    res.json(albums);
   } catch (err) {
-    console.error('Recommendation error:', err);
+    console.error('LIKED ALBUMS ERROR:', err.message || err);
     res.status(500).json({ error: err.message });
-  }
-});
-
-// refresh token
-app.post('/api/spotify/refresh', async (req, res) => {
-  const { refresh_token } = req.body;
-  spotifyApi.setRefreshToken(refresh_token);
-  try {
-    const data = await spotifyApi.refreshAccessToken();
-    const access_token = data.body.access_token;
-    res.json({ access_token });
-  } catch (err) {
-    res.status(400).json({ error: err.message });
   }
 });
 
@@ -189,6 +215,78 @@ app.get('/api/user/me', async (req, res) => {
     res.json({ username: user.username, spotifyId: user.spotifyId });
   } catch (err) {
     res.status(401).json({ error: 'Invalid token' });
+  }
+});
+
+// Activity Endpoints
+app.get('/api/spotify/recently-played', authMiddleware, async (req, res) => {
+  try {
+    const data = await spotifyApi.getMyRecentlyPlayedTracks({ limit: 4 });
+    const tracks = data.body.items.map(item => ({
+      title: item.track.name,
+      artist: item.track.artists.map(a => a.name).join(', '),
+      image: item.track.album.images[0]?.url || ''
+    }));
+    res.json(tracks);
+  } catch (err) {
+    console.error('RECENTLY PLAYED ERROR:', err.message || err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/spotify/recommendations', authMiddleware, async (req, res) => {
+  try {
+    const topTracks = await spotifyApi.getMyTopTracks({ limit: 5 });
+    const seedTracks = topTracks.body.items.map(track => track.id).slice(0, 2);
+    const data = await spotifyApi.getRecommendations({
+      seed_tracks: seedTracks,
+      limit: 4,
+      target_energy: 0.5,
+      target_valence: 0.5
+    });
+    const tracks = data.body.tracks.map(track => ({
+      title: track.name,
+      artist: track.artists.map(a => a.name).join(', '),
+      image: track.album.images[0]?.url || ''
+    }));
+    res.json(tracks);
+  } catch (err) {
+    console.error('RECCOMMENDATION ERROR:', err.message || err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Mood Endpoint
+app.post('/api/spotify/mood-playlists', authMiddleware, async (req, res) => {
+  const { mood } = req.body;
+  try {
+    const moodConfigs = {
+      love: { genres: 'pop,romantic', energy: 0.4, valence: 0.6 },
+      rage: { genres: 'rock,metal', energy: 0.9, valence: 0.3 },
+      optimism: { genres: 'pop,indie-pop', energy: 0.7, valence: 0.8 },
+      joy: { genres: 'dance,pop', energy: 0.8, valence: 0.9 },
+      nostalgia: { genres: 'retro,classic-rock', energy: 0.5, valence: 0.5 },
+      confident: { genres: 'pop,hip-hop', energy: 0.8, valence: 0.7 },
+      'hyper craze': { genres: 'edm,electronic', energy: 0.9, valence: 0.8 },
+      sad: { genres: 'acoustic,indie', energy: 0.3, valence: 0.2 }
+    };
+
+    const config = moodConfigs[mood] || { genres: 'pop', energy: 0.5, valence: 0.5 };
+    const data = await spotifyApi.getRecommendations({
+      seed_genres: config.genres,
+      limit: 4,
+      target_energy: config.energy,
+      target_valence: config.valence
+    });
+    const tracks = data.body.tracks.map(track => ({
+      title: track.name,
+      artist: track.artists.map(a => a.name).join(', '),
+      image: track.album.images[0]?.url || ''
+    }));
+    res.json(tracks);
+  } catch (err) {
+    console.error('MODD PLAYLISTS ERROR:', err.message || err);
+    res.status(500).json({ error: err.message });
   }
 });
 

@@ -1,36 +1,61 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import axios from 'axios';
 import './Activity.css';
 
 const Activity = () => {
-  const dummyPlaylists = {
-    recentlyPlayed: [
-      { title: 'Last Night’s Study', artist: 'Chillhop Music' },
-      { title: 'Morning Focus', artist: 'Lo-Fi Hip Hop' },
-      { title: 'Evening Wind Down', artist: 'Relaxing Piano' },
-      { title: 'Quick Break', artist: 'Jazz Vibes' }
-    ],
-    albumsLiked: [
-      { title: 'Classical Favorites', artist: 'Orchestral Hits' },
-      { title: 'Pop Study Mix', artist: 'Top 40 Essentials' },
-      { title: 'Electronic Chill', artist: 'Synth Waves' },
-      { title: 'Acoustic Moods', artist: 'Folk Tunes' }
-    ],
-    newRecommendations: [
-      { title: 'New Lo-Fi Drop', artist: 'Beat Makers' },
-      { title: 'Fresh Classical', artist: 'Symphony Newbies' },
-      { title: 'Upbeat Study', artist: 'Pop Newcomers' },
-      { title: 'Ambient Discovery', artist: 'Soundscapes' }
-    ]
-  };
+  const [recentlyPlayed, setRecentlyPlayed] = useState([]);
+  const [likedAlbums, setLikedAlbums] = useState([]);
+  const [recommendations, setRecommendations] = useState([]);
+  const [error, setError] = useState('');
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    const token = localStorage.getItem('jwt_token');
+    if (!token) {
+      navigate('/login');
+      return;
+    }
+
+    const fetchData = async () => {
+      try {
+        const headers = { Authorization: `Bearer ${token}` };
+
+        const [recRes, albRes, recmRes] = await Promise.all([
+          axios.get('http://localhost:5000/api/spotify/recently-played', { headers }),
+          axios.get('http://localhost:5000/api/spotify/liked-albums',   { headers }),
+          axios.get('http://localhost:5000/api/spotify/recommendations', { headers })
+        ]);
+
+        setRecentlyPlayed(recRes.data);
+        setLikedAlbums(albRes.data);
+        setRecommendations(recmRes.data);
+        setError('');
+      } catch (err) {
+        const msg = err.response?.data?.error || err.message || 'Failed to fetch data from Spotify.';
+        setError(msg);
+      }
+    };
+
+    fetchData();
+  }, [navigate]);
 
   return (
     <div className="activity">
+      {error && (
+        <p className="error">
+          {error}{' '}
+          {error.includes('Spotify not connected') && (
+            <button onClick={() => navigate('/profile')}>Go to Profile</button>
+          )}
+        </p>
+      )}
       <section className="activity-section">
         <h2>Playlists based on your recently played</h2>
         <div className="playlist-cards">
-          {dummyPlaylists.recentlyPlayed.map((playlist, index) => (
+          {recentlyPlayed.map((playlist, index) => (
             <div key={index} className="playlist-card">
-              <div className="card-image"></div>
+              <div className="card-image" style={{ backgroundImage: `url(${playlist.image})` }}></div>
               <div className="card-content">
                 <h3>{playlist.title}</h3>
                 <p>{playlist.artist}</p>
@@ -38,124 +63,34 @@ const Activity = () => {
             </div>
           ))}
         </div>
-        {/* <div className="playlist-cards">
-          <div className="playlist-card">
-            <div className="card-image"></div>
-            <div className="card-content">
-              <h3>Playlist Title 1</h3>
-              <p>Artist Placeholder</p>
-            </div>
-          </div>
-          <div className="playlist-card">
-            <div className="card-image"></div>
-            <div className="card-content">
-              <h3>Playlist Title 2</h3>
-              <p>Artist Placeholder</p>
-            </div>
-          </div>
-          <div className="playlist-card">
-            <div className="card-image"></div>
-            <div className="card-content">
-              <h3>Playlist Title 3</h3>
-              <p>Artist Placeholder</p>
-            </div>
-          </div>
-          <div className="playlist-card">
-            <div className="card-image"></div>
-            <div className="card-content">
-              <h3>Playlist Title 4</h3>
-              <p>Artist Placeholder</p>
-            </div>
-          </div>
-        </div> */}
       </section>
       <section className="activity-section">
         <h2>Playlists featuring songs you like</h2>
         <div className="playlist-cards">
-          {dummyPlaylists.albumsLiked.map((playlist, index) => (
+          {likedAlbums.map((album, index) => (
             <div key={index} className="playlist-card">
-              <div className="card-image"></div>
+              <div className="card-image" style={{ backgroundImage: `url(${album.image})` }}></div>
               <div className="card-content">
-                <h3>{playlist.title}</h3>
-                <p>{playlist.artist}</p>
+                <h3>{album.title}</h3>
+                <p>{album.artist}</p>
               </div>
             </div>
           ))}
         </div>
-        {/* <div className="playlist-cards">
-          <div className="playlist-card">
-            <div className="card-image"></div>
-            <div className="card-content">
-              <h3>Playlist Title 1</h3>
-              <p>Artist Placeholder</p>
-            </div>
-          </div>
-          <div className="playlist-card">
-            <div className="card-image"></div>
-            <div className="card-content">
-              <h3>Playlist Title 2</h3>
-              <p>Artist Placeholder</p>
-            </div>
-          </div>
-          <div className="playlist-card">
-            <div className="card-image"></div>
-            <div className="card-content">
-              <h3>Playlist Title 3</h3>
-              <p>Artist Placeholder</p>
-            </div>
-          </div>
-          <div className="playlist-card">
-            <div className="card-image"></div>
-            <div className="card-content">
-              <h3>Playlist Title 4</h3>
-              <p>Artist Placeholder</p>
-            </div>
-          </div>
-        </div> */}
       </section>
       <section className="activity-section">
         <h2>New songs we think you might like</h2>
         <div className="playlist-cards">
-          {dummyPlaylists.newRecommendations.map((playlist, index) => (
+          {recommendations.map((track, index) => (
             <div key={index} className="playlist-card">
-              <div className="card-image"></div>
+              <div className="card-image" style={{ backgroundImage: `url(${track.image})` }}></div>
               <div className="card-content">
-                <h3>{playlist.title}</h3>
-                <p>{playlist.artist}</p>
+                <h3>{track.title}</h3>
+                <p>{track.artist}</p>
               </div>
             </div>
           ))}
         </div>
-        {/* <div className="playlist-cards">
-          <div className="playlist-card">
-            <div className="card-image"></div>
-            <div className="card-content">
-              <h3>Playlist Title 1</h3>
-              <p>Artist Placeholder</p>
-            </div>
-          </div>
-          <div className="playlist-card">
-            <div className="card-image"></div>
-            <div className="card-content">
-              <h3>Playlist Title 2</h3>
-              <p>Artist Placeholder</p>
-            </div>
-          </div>
-          <div className="playlist-card">
-            <div className="card-image"></div>
-            <div className="card-content">
-              <h3>Playlist Title 3</h3>
-              <p>Artist Placeholder</p>
-            </div>
-          </div>
-          <div className="playlist-card">
-            <div className="card-image"></div>
-            <div className="card-content">
-              <h3>Playlist Title 4</h3>
-              <p>Artist Placeholder</p>
-            </div>
-          </div>
-        </div> */}
       </section>
     </div>
   );
