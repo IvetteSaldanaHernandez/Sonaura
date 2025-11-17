@@ -5,9 +5,24 @@ const cors = require('cors');
 
 const app = express();
 
+// CORS Configuration - FIX FOR SPOTIFY
+app.use(cors({
+  origin: ['http://127.0.0.1:3000', 'http://localhost:3000'],
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
+}));
+
 // Middleware
 app.use(cors());
 app.use(express.json());
+
+// Request logging middleware
+app.use((req, res, next) => {
+  console.log(`${new Date().toISOString()} - ${req.method} ${req.path}`);
+  console.log('Headers:', req.headers);
+  next();
+});
 
 // MongoDB connection
 mongoose.connect(process.env.MONGO_URI || 'mongodb://localhost:27017/sonaura', {
@@ -18,6 +33,11 @@ mongoose.connect(process.env.MONGO_URI || 'mongodb://localhost:27017/sonaura', {
 .catch(err => {
   console.error('MongoDB connection error:', err);
   process.exit(1);
+});
+
+app.use((req, res, next) => {
+  console.log(`${new Date().toISOString()} - ${req.method} ${req.path}`);
+  next();
 });
 
 // Routes
@@ -43,9 +63,8 @@ app.use((error, req, res, next) => {
 });
 
 // 404 handler
-// Use a pathless middleware instead of `'*'` to avoid path-to-regexp errors
 app.use((req, res) => {
-  res.status(404).json({ error: 'Route not found' });
+  res.status(404).json({ error: 'Route not found', path: req.path });
 });
 
 const PORT = process.env.PORT || 5000;

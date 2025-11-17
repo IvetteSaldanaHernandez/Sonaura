@@ -40,6 +40,30 @@ const Activity = () => {
     fetchData();
   }, [navigate]);
 
+  const handlePlaylistClick = (playlist, sectionType) => {
+    // Navigate to playlist view with playlist data
+    navigate('/playlist-view', { 
+      state: { 
+        playlist,
+        sectionType,
+        recommendationReason: getRecommendationReason(sectionType)
+      }
+    });
+  };
+
+  const getRecommendationReason = (sectionType) => {
+    switch(sectionType) {
+      case 'recentlyPlayed':
+        return 'Based on your recently played tracks';
+      case 'likedAlbums':
+        return 'Featuring songs from your liked albums';
+      case 'recommendations':
+        return 'New recommendations based on your taste';
+      default:
+        return 'Personalized for you';
+    }
+  };
+
   return (
     <div className="activity">
       {error && (
@@ -50,12 +74,19 @@ const Activity = () => {
           )}
         </p>
       )}
+      
       <section className="activity-section">
         <h2>Playlists based on your recently played</h2>
         <div className="playlist-cards">
           {recentlyPlayed.map((playlist, index) => (
-            <div key={index} className="playlist-card">
-              <div className="card-image" style={{ backgroundImage: `url(${playlist.image})` }}></div>
+            <div 
+              key={index} 
+              className="playlist-card"
+              onClick={() => handlePlaylistClick(playlist, 'recentlyPlayed')}
+            >
+              <div className="card-image" style={{ backgroundImage: `url(${playlist.image})` }}>
+                {!playlist.image && <div className="image-placeholder">🎵</div>}
+              </div>
               <div className="card-content">
                 <h3>{playlist.title}</h3>
                 <p>{playlist.artist}</p>
@@ -64,12 +95,19 @@ const Activity = () => {
           ))}
         </div>
       </section>
+
       <section className="activity-section">
         <h2>Playlists featuring songs you like</h2>
         <div className="playlist-cards">
           {likedAlbums.map((album, index) => (
-            <div key={index} className="playlist-card">
-              <div className="card-image" style={{ backgroundImage: `url(${album.image})` }}></div>
+            <div 
+              key={index} 
+              className="playlist-card"
+              onClick={() => handlePlaylistClick(album, 'likedAlbums')}
+            >
+              <div className="card-image" style={{ backgroundImage: `url(${album.image})` }}>
+                {!album.image && <div className="image-placeholder">🎵</div>}
+              </div>
               <div className="card-content">
                 <h3>{album.title}</h3>
                 <p>{album.artist}</p>
@@ -78,12 +116,19 @@ const Activity = () => {
           ))}
         </div>
       </section>
+
       <section className="activity-section">
         <h2>New songs we think you might like</h2>
         <div className="playlist-cards">
           {recommendations.map((track, index) => (
-            <div key={index} className="playlist-card">
-              <div className="card-image" style={{ backgroundImage: `url(${track.image})` }}></div>
+            <div 
+              key={index} 
+              className="playlist-card"
+              onClick={() => handlePlaylistClick(track, 'recommendations')}
+            >
+              <div className="card-image" style={{ backgroundImage: `url(${track.image})` }}>
+                {!track.image && <div className="image-placeholder">🎵</div>}
+              </div>
               <div className="card-content">
                 <h3>{track.title}</h3>
                 <p>{track.artist}</p>

@@ -12,12 +12,21 @@ const refreshAccessToken = async (user) => {
       throw new Error('No refresh token available');
     }
 
-    spotifyApi.setRefreshToken(user.spotifyRefreshToken);
-    const data = await spotifyApi.refreshAccessToken();
+    const refreshSpotifyApi = new SpotifyWebApi({
+      clientId: process.env.SPOTIFY_CLIENT_ID,
+      clientSecret: process.env.SPOTIFY_CLIENT_SECRET,
+      refreshToken: user.spotifyRefreshToken
+    });
+
+    const data = await refreshSpotifyApi.refreshAccessToken();
     const newToken = data.body.access_token;
 
     // Update user with new token
     user.spotifyToken = newToken;
+    // Spotify may also return a new refresh token
+    if (data.body.refresh_token) {
+      user.spotifyRefreshToken = data.body.refresh_token;
+    }
     await user.save();
 
     return newToken;
@@ -33,22 +42,28 @@ const spotifyAuthMiddleware = async (req, res, next) => {
       return res.status(403).json({ error: 'Spotify not connected' });
     }
 
-    spotifyApi.setAccessToken(req.user.spotifyToken);
+    // Create a NEW instance for each request
+    const userSpotifyApi = new SpotifyWebApi({
+      clientId: process.env.SPOTIFY_CLIENT_ID,
+      clientSecret: process.env.SPOTIFY_CLIENT_SECRET
+    });
+
+    userSpotifyApi.setAccessToken(req.user.spotifyToken);
 
     // Test token validity
     try {
-      await spotifyApi.getMe();
+      await userSpotifyApi.getMe();
     } catch (error) {
       if (error.statusCode === 401) {
         // Token expired, refresh it
         const newToken = await refreshAccessToken(req.user);
-        spotifyApi.setAccessToken(newToken);
+        userSpotifyApi.setAccessToken(newToken);
       } else {
         throw error;
       }
     }
 
-    req.spotifyApi = spotifyApi;
+    req.spotifyApi = userSpotifyApi;
     next();
   } catch (error) {
     console.error('Spotify auth middleware error:', error);

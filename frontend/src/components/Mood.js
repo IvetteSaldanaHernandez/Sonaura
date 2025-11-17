@@ -41,12 +41,23 @@ const Mood = () => {
   }, [selectedMood, navigate]);
 
   const handleMoodClick = (mood) => {
-    setSelectedMood(mood); // set mood
+    setSelectedMood(mood);
+  };
+
+  const handlePlaylistClick = (playlist) => {
+    navigate('/playlist-view', { 
+      state: { 
+        playlist,
+        sectionType: 'mood',
+        recommendationReason: `Curated for your ${selectedMood} mood`,
+        moodColor: getMoodColor(selectedMood)
+      }
+    });
   };
 
   const getMoodColor = (moodName) => {
     const mood = moods.find(m => m.name === moodName);
-    return mood ? mood.color : '#ccc'; // Default to white if mood not found
+    return mood ? mood.color : '#ccc';
   };
 
   return (
@@ -57,7 +68,7 @@ const Mood = () => {
           {moods.map((mood, index) => (
             <button
               key={index}
-              className="mood-button"
+              className={`mood-button ${selectedMood === mood.name ? 'active' : ''}`}
               style={{ backgroundColor: mood.color }}
               onClick={() => handleMoodClick(mood.name)}
             >
@@ -66,9 +77,10 @@ const Mood = () => {
           ))}
         </div>
       </section>
+      
       {selectedMood && (
         <section className="playlist-section">
-          <h2>Playlists based on your mood</h2>
+          <h2>Playlists for your {selectedMood} mood</h2>
           {error && (
             <p className="error">
               {error}{' '}
@@ -79,9 +91,15 @@ const Mood = () => {
           )}
           <div className="playlist-cards">
             {playlists.map((playlist, index) => (
-              <div key={index} className="playlist-card">
-                <div className="card-image" style={{ backgroundImage: `url(${playlist.image})` }}></div>
-                <div className="card-content" style={{ backgroundColor: getMoodColor(selectedMood) }}>
+              <div 
+                key={index} 
+                className="playlist-card"
+                onClick={() => handlePlaylistClick(playlist)}
+              >
+                <div className="card-image" style={{ backgroundImage: `url(${playlist.image})` }}>
+                  {!playlist.image && <div className="image-placeholder">🎵</div>}
+                </div>
+                <div className="card-content" style={{ backgroundColor: getMoodColor(selectedMood) + '40' }}>
                   <h3>{playlist.title}</h3>
                   <p>{playlist.artist}</p>
                 </div>

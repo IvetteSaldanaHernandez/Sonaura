@@ -6,53 +6,60 @@ const Callback = ({ setIsAuthenticated }) => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    const urlParams = new URLSearchParams(window.location.search);
-    const code = urlParams.get('code');
-    // const state = urlParams.get('state');
+    const handleSpotifyCallback = async () => {
+      const urlParams = new URLSearchParams(window.location.search);
+      const code = urlParams.get('code');
+      const error = urlParams.get('error');
 
-    if (code) {
-    //   axios.get(`http://localhost:5000/api/spotify/callback?code=${code}`)
-    //     .then(res => {
-    //       localStorage.setItem('spotify_token', res.data.access_token);
-    //       localStorage.setItem('spotify_refresh_token', res.data.refresh_token);
-    //       localStorage.setItem('jwt_token', res.data.token);
-    //       setIsAuthenticated(true);
-    //       navigate('/profile');
-    //     })
-    //     .catch(err => {
-    //       console.error('Callback error:', err);
-    //       navigate('/login'); // Redirect to login on error
-    //     });
-      const isSpotifyConnect = localStorage.getItem('pending_spotify_connect') === 'true';
-      const jwtToken = localStorage.getItem('jwt_token');
-      const endpoint = isSpotifyConnect ? '/api/spotify/connect' : '/api/spotify/callback';
+      if (error) {
+        console.error('Spotify auth error:', error);
+        navigate('/login');
+        return;
+      }
 
-      const requestData = isSpotifyConnect ? { code, userId: jwtToken } : { code };
-
-      axios.post(`http://localhost:5000${endpoint}`, requestData, {
-        headers: isSpotifyConnect ? { Authorization: `Bearer ${jwtToken}` } : {}
-      })
-        .then(res => {
-          localStorage.setItem('spotify_token', res.data.access_token);
-          localStorage.setItem('spotify_refresh_token', res.data.refresh_token);
-          if (!isSpotifyConnect) {
-            localStorage.setItem('jwt_token', res.data.token);
-            setIsAuthenticated(true);
-          }
-          localStorage.removeItem('pending_spotify_connect');
+      if (code) {
+        const isSpotifyConnect = localStorage.getItem('pending_spotify_connect') === 'true';
+        
+        try {
           if (isSpotifyConnect) {
-            localStorage.setItem('spotify_connect_success', 'true'); // Flag for success message
+            // Handle Spotify connection for existing user
+            const jwtToken = localStorage.getItem('jwt_token');
+            
+            // Send code to backend to get tokens
+            const response = await axios.post('http://localhost:5000/api/spotify/connect', 
+              { code },
+              { headers: { Authorization: `Bearer ${jwtToken}` } }
+            );
+
+            localStorage.setItem('spotify_token', response.data.access_token);
+            localStorage.setItem('spotify_refresh_token', response.data.refresh_token);
+            localStorage.removeItem('pending_spotify_connect');
+            localStorage.setItem('spotify_connect_success', 'true');
+            navigate('/profile');
+            
+          } else {
+            // Handle initial login with Spotify
+            const response = await axios.post('http://localhost:5000/api/spotify/callback', { code });
+            
+            localStorage.setItem('spotify_token', response.data.access_token);
+            localStorage.setItem('spotify_refresh_token', response.data.refresh_token);
+            localStorage.setItem('jwt_token', response.data.token);
+            setIsAuthenticated(true);
+            navigate('/profile');
           }
-          navigate('/profile');
-        })
-        .catch(err => {
+        } catch (err) {
           console.error('Callback error:', err);
           navigate('/login');
-        });
-    }
+        }
+      } else {
+        navigate('/login');
+      }
+    };
+
+    handleSpotifyCallback();
   }, [navigate, setIsAuthenticated]);
 
-  return <div>Loading...</div>;
+  return <div>Connecting to Spotify...</div>;
 };
 
 export default Callback;
