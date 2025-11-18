@@ -1,635 +1,330 @@
 const express = require('express');
-const SpotifyWebApi = require('spotify-web-api-node');
+const axios = require('axios');
+const auth = require('../middleware/auth');
 const User = require('../models/User');
-const authMiddleware = require('../middleware/auth');
-const { spotifyAuthMiddleware } = require('../middleware/spotifyAuth');
-const jwt = require('jsonwebtoken')
-const bcrypt = require('bcryptjs');
 const router = express.Router();
 
-// Initialize Spotify API
-// const spotifyApi = new SpotifyWebApi({
-//   clientId: process.env.SPOTIFY_CLIENT_ID,
-//   clientSecret: process.env.SPOTIFY_CLIENT_SECRET,
-//   redirectUri: process.env.SPOTIFY_REDIRECT_URI
-// });
-
-// Get Spotify login URL
+// Get Spotify auth URL
 router.get('/auth-url', (req, res) => {
-  const scopes = [
-    'user-read-private',
-    'user-read-email',
-    'user-read-recently-played',
-    'user-library-read',
-    'user-top-read',
-    'playlist-read-private',
-    'playlist-read-collaborative',
-    'user-read-currently-playing',
-    'user-read-playback-state'
-  ];
-
-  const authUrl = spotifyApi.createAuthorizeURL(scopes, 'state');
-  console.log('Generated auth URL with scopes:', scopes)
+  const authUrl = `https://accounts.spotify.com/authorize?` +
+    `client_id=${process.env.SPOTIFY_CLIENT_ID}` +
+    `&response_type=code` +
+    `&redirect_uri=${encodeURIComponent(process.env.SPOTIFY_REDIRECT_URI)}` +
+    `&scope=${encodeURIComponent('user-read-private user-read-email user-read-recently-played user-library-read playlist-read-private playlist-read-collaborative')}` +
+    `&show_dialog=true`;
+  
   res.json({ authUrl });
 });
 
-// Handle Spotify callback
+// Initial login with Spotify
+router.get('/login', (req, res) => {
+  const authUrl = `https://accounts.spotify.com/authorize?` +
+    `client_id=${process.env.SPOTIFY_CLIENT_ID}` +
+    `&response_type=code` +
+    `&redirect_uri=${encodeURIComponent(process.env.SPOTIFY_REDIRECT_URI)}` +
+    `&scope=${encodeURIComponent('user-read-private user-read-email user-read-recently-played user-library-read playlist-read-private playlist-read-collaborative')}`;
+  
+  res.json({ url: authUrl });
+});
+
+// Spotify callback - initial login
 router.post('/callback', async (req, res) => {
   try {
     const { code } = req.body;
 
-    if (!code) {
-      return res.status(400).json({ error: 'No authorization code provided' });
-    }
-
     // Exchange code for tokens
-    const data = await spotifyApi.authorizationCodeGrant(code);
-    const { access_token, refresh_token, expires_in } = data.body;
+    const tokenResponse = await axios.post('https://accounts.spotify.com/api/token', 
+      new URLSearchParams({
+        grant_type: 'authorization_code',
+        code,
+        redirect_uri: process.env.SPOTIFY_REDIRECT_URI,
+        client_id: process.env.SPOTIFY_CLIENT_ID,
+        client_secret: process.env.SPOTIFY_CLIENT_SECRET
+      }),
+      {
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded'
+        }
+      }
+    );
 
-    spotifyApi.setAccessToken(access_token);
+    const { access_token, refresh_token } = tokenResponse.data;
 
-    // Get Spotify user info
-    const spotifyUser = await spotifyApi.getMe();
-
-    // Create or update user in database
-    let user = await User.findOne({ spotifyId: spotifyUser.body.id });
-    if (!user) {
-      // Generate a random password for Spotify-only users
-      const tempPassword = await bcrypt.hash(Math.random().toString(36), 12);
-
-      user = new User({
-        username: spotifyUser.body.display_name || `spotify_${spotifyUser.body.id}`,
-        password: tempPassword,
-        spotifyId: spotifyUser.body.id,
-        spotifyToken: access_token,
-        spotifyRefreshToken: refresh_token
-      });
-      await user.save();
-    } else {
-      user.spotifyToken = access_token;
-      user.spotifyRefreshToken = refresh_token;
-      await user.save();
-    }
-
-    const jwtToken = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, { expiresIn: '7d' });
-    
-    res.json({
-      token: jwtToken,
-      access_token,
-      refresh_token,
-      expires_in,
-      user: {
-        id: user._id,
-        username: user.username,
-        spotifyId: user.spotifyId
+    // Get user info from Spotify
+    const userResponse = await axios.get('https://api.spotify.com/v1/me', {
+      headers: {
+        'Authorization': `Bearer ${access_token}`
       }
     });
+
+    // Create or update user in database
+    const spotifyUsername = userResponse.data.id;
+    let user = await User.findOne({ username: spotifyUsername });
+
+    if (!user) {
+      user = new User({
+        username: spotifyUsername,
+        password: await require('bcryptjs').hash(spotifyUsername + Date.now(), 10),
+        spotifyAccessToken: access_token,
+        spotifyRefreshToken: refresh_token,
+        hasSpotify: true
+      });
+    } else {
+      user.spotifyAccessToken = access_token;
+      user.spotifyRefreshToken = refresh_token;
+      user.hasSpotify = true;
+    }
+
+    await user.save();
+
+    // Create JWT token
+    const token = require('jsonwebtoken').sign(
+      { userId: user._id },
+      process.env.JWT_SECRET,
+      { expiresIn: '24h' }
+    );
+
+    res.json({
+      access_token,
+      refresh_token,
+      token
+    });
   } catch (error) {
-    console.error('Callback error:', error);
-    res.status(500).json({ error: 'Failed to authenticate with Spotify: ' + error.message });
+    console.error('Spotify callback error:', error.response?.data || error.message);
+    res.status(500).json({ error: 'Failed to authenticate with Spotify' });
   }
 });
 
-// Connect Spotify to user account
-router.post('/connect', authMiddleware, async (req, res) => {
+// Connect Spotify to existing account
+router.post('/connect', auth, async (req, res) => {
   try {
     const { code } = req.body;
 
-    if (!code) {
-      return res.status(400).json({ error: 'No authorization code provided' });
-    }
-
     // Exchange code for tokens
-    const data = await spotifyApi.authorizationCodeGrant(code);
-    const { access_token, refresh_token, expires_in } = data.body;
+    const tokenResponse = await axios.post('https://accounts.spotify.com/api/token', 
+      new URLSearchParams({
+        grant_type: 'authorization_code',
+        code,
+        redirect_uri: process.env.SPOTIFY_REDIRECT_URI,
+        client_id: process.env.SPOTIFY_CLIENT_ID,
+        client_secret: process.env.SPOTIFY_CLIENT_SECRET
+      }),
+      {
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded'
+        }
+      }
+    );
 
-    spotifyApi.setAccessToken(access_token);
-    const spotifyUser = await spotifyApi.getMe();
+    const { access_token, refresh_token } = tokenResponse.data;
 
-    // Update current user with Spotify info
-    req.user.spotifyId = spotifyUser.body.id;
-    req.user.spotifyToken = access_token;
+    // Update user with Spotify tokens
+    req.user.spotifyAccessToken = access_token;
     req.user.spotifyRefreshToken = refresh_token;
+    req.user.hasSpotify = true;
     await req.user.save();
 
     res.json({
-      message: 'Spotify connected successfully',
       access_token,
       refresh_token,
-      expires_in,
-      spotifyUser: {
-        id: spotifyUser.body.id,
-        display_name: spotifyUser.body.display_name
-      }
+      message: 'Spotify connected successfully'
     });
   } catch (error) {
-    console.error('Spotify connect error:', error);
-    res.status(500).json({ error: 'Failed to connect Spotify account: ' + error.message });
+    console.error('Spotify connect error:', error.response?.data || error.message);
+    res.status(500).json({ error: 'Failed to connect Spotify' });
   }
 });
 
-// Get recently played tracks
-router.get('/recently-played', authMiddleware, spotifyAuthMiddleware, async (req, res) => {
+// Refresh Spotify token if needed
+async function refreshSpotifyToken(user) {
   try {
-    const data = await req.spotifyApi.getMyRecentlyPlayedTracks({ limit: 4 });
-    
-    const tracks = data.body.items.map(item => ({
-      title: item.track.name,
-      artist: item.track.artists.map(artist => artist.name).join(', '),
-      image: item.track.album.images[0]?.url || ''
-    }));
+    const response = await axios.post('https://accounts.spotify.com/api/token', 
+      new URLSearchParams({
+        grant_type: 'refresh_token',
+        refresh_token: user.spotifyRefreshToken,
+        client_id: process.env.SPOTIFY_CLIENT_ID,
+        client_secret: process.env.SPOTIFY_CLIENT_SECRET
+      }),
+      {
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded'
+        }
+      }
+    );
 
-    res.json(tracks);
+    user.spotifyAccessToken = response.data.access_token;
+    await user.save();
+    
+    return response.data.access_token;
+  } catch (error) {
+    throw new Error('Failed to refresh Spotify token');
+  }
+}
+
+// Get valid Spotify token
+async function getValidSpotifyToken(user) {
+  try {
+    // Test current token
+    await axios.get('https://api.spotify.com/v1/me', {
+      headers: {
+        'Authorization': `Bearer ${user.spotifyAccessToken}`
+      }
+    });
+    return user.spotifyAccessToken;
+  } catch (error) {
+    // Token expired, refresh it
+    return await refreshSpotifyToken(user);
+  }
+}
+
+// Mock data for demonstration
+const mockPlaylists = [
+  {
+    title: "Deep Focus",
+    artist: "Study Beats",
+    image: "https://images.unsplash.com/photo-1511379938547-c1f69419868d?w=300",
+    description: "Concentration enhancing tracks"
+  },
+  {
+    title: "Lo-Fi Study",
+    artist: "Chillhop Music",
+    image: "https://images.unsplash.com/photo-1571974599782-87624638275f?w=300",
+    description: "Relaxing lo-fi beats"
+  },
+  {
+    title: "Productivity Boost",
+    artist: "Focus Flow",
+    image: "https://images.unsplash.com/photo-1494232410401-ad00d5433cfa?w=300",
+    description: "Energetic focus music"
+  }
+];
+
+// Recently played endpoint
+router.get('/recently-played', auth, async (req, res) => {
+  try {
+    if (!req.user.hasSpotify) {
+      return res.status(400).json({ error: 'Spotify not connected' });
+    }
+
+    const token = await getValidSpotifyToken(req.user);
+    
+    // For now, return mock data - you can replace this with actual Spotify API calls
+    res.json(mockPlaylists);
+    
   } catch (error) {
     console.error('Recently played error:', error);
-    
-    // Simple fallback
-    const fallbackTracks = [
-      {
-        title: "Study Focus",
-        artist: "Various Artists",
-        image: ""
-      },
-      {
-        title: "Lo-Fi Beats",
-        artist: "Chillhop Music", 
-        image: ""
-      },
-      {
-        title: "Deep Concentration",
-        artist: "Focus Flow",
-        image: ""
-      },
-      {
-        title: "Productivity Mix",
-        artist: "Work Sounds",
-        image: ""
-      }
-    ];
-    
-    res.json(fallbackTracks);
+    res.status(500).json({ error: 'Failed to fetch recently played' });
   }
 });
 
-// Get liked albums
-router.get('/liked-albums', authMiddleware, spotifyAuthMiddleware, async (req, res) => {
+// Liked albums endpoint
+router.get('/liked-albums', auth, async (req, res) => {
   try {
-    // Get user's saved albums (this is what "liked albums" typically means)
-    const savedAlbums = await req.spotifyApi.getMySavedAlbums({ limit: 4 });
-    
-    const albums = savedAlbums.body.items.map(item => ({
-      title: item.album.name,
-      artist: item.album.artists.map(artist => artist.name).join(', '),
-      image: item.album.images[0]?.url || ''
-    }));
+    if (!req.user.hasSpotify) {
+      return res.status(400).json({ error: 'Spotify not connected' });
+    }
 
-    res.json(albums);
-  } catch (error) {
-    console.error('❌ Liked albums error:', error);
+    const token = await getValidSpotifyToken(req.user);
     
-    // Fallback study playlists
-    const fallbackPlaylists = [
-      {
-        title: "Lo-Fi Beats",
-        artist: "Chillhop Music",
-        image: ""
-      },
-      {
-        title: "Deep Focus",
-        artist: "Spotify",
-        image: ""
-      },
-      {
-        title: "Jazz for Study",
-        artist: "Jazz Vibes",
-        image: ""
-      },
-      {
-        title: "Classical Study",
-        artist: "Peaceful Piano",
-        image: ""
-      }
-    ];
-    
-    console.log('✅ Returning fallback liked albums');
-    res.json(fallbackPlaylists);
-  }
-});
-
-router.get('/recommendations', authMiddleware, spotifyAuthMiddleware, async (req, res) => {
-  console.log('=== RECOMMENDATIONS START ===');
-  
-  try {
-    // Get featured playlists for recommendations
-    console.log('Getting featured playlists...');
-    const featuredPlaylists = await req.spotifyApi.getFeaturedPlaylists({ limit: 4 });
-    
-    console.log('✅ Featured playlists found:', featuredPlaylists.body.playlists.items.length);
-
-    const playlists = featuredPlaylists.body.playlists.items.map(playlist => ({
-      title: playlist.name,
-      artist: playlist.owner.display_name,
-      image: playlist.images[0]?.url || ''
-    }));
-
-    console.log('=== RECOMMENDATIONS SUCCESS ===');
-    res.json(playlists);
+    // Mock data - replace with actual Spotify API
+    res.json(mockPlaylists);
     
   } catch (error) {
-    console.error('❌ RECOMMENDATIONS FAILED:');
-    console.error('Error:', error.message);
-    
-    // Return fallback playlists
-    const fallbackPlaylists = [
-      {
-        title: "Discover Weekly",
-        artist: "Spotify",
-        image: ""
-      },
-      {
-        title: "Release Radar", 
-        artist: "Spotify",
-        image: ""
-      },
-      {
-        title: "Daily Mix 1",
-        artist: "Spotify", 
-        image: ""
-      },
-      {
-        title: "Study Focus",
-        artist: "Curated Playlist",
-        image: ""
-      }
-    ];
-    
-    console.log('✅ Returning fallback playlists');
-    res.json(fallbackPlaylists);
+    console.error('Liked albums error:', error);
+    res.status(500).json({ error: 'Failed to fetch liked albums' });
   }
 });
 
-router.post('/mood-playlists', authMiddleware, spotifyAuthMiddleware, async (req, res) => {
+// Recommendations endpoint
+router.get('/recommendations', auth, async (req, res) => {
+  try {
+    if (!req.user.hasSpotify) {
+      return res.status(400).json({ error: 'Spotify not connected' });
+    }
+
+    const token = await getValidSpotifyToken(req.user);
+    
+    // Mock data - replace with actual Spotify API
+    res.json(mockPlaylists);
+    
+  } catch (error) {
+    console.error('Recommendations error:', error);
+    res.status(500).json({ error: 'Failed to fetch recommendations' });
+  }
+});
+
+// Mood playlists endpoint
+router.post('/mood-playlists', auth, async (req, res) => {
   try {
     const { mood } = req.body;
-    console.log('🎵 Fetching mood playlists for:', mood);
-
-    const moodSearchTerms = {
-      love: 'love',
-      rage: 'rock',
-      optimism: 'happy',
-      joy: 'joy',
-      nostalgia: 'nostalgic',
-      confident: 'confidence',
-      'hyper craze': 'energy',
-      sad: 'sad'
-    };
-
-    const searchTerm = moodSearchTerms[mood] || 'study';
     
-    try {
-      // Try to search for playlists
-      const playlists = await req.spotifyApi.searchPlaylists(searchTerm, { limit: 4 });
-      console.log('✅ Mood playlists found:', playlists.body.playlists.items.length);
-
-      const playlistData = playlists.body.playlists.items.map(playlist => ({
-        title: playlist.name,
-        artist: playlist.owner.display_name,
-        image: playlist.images[0]?.url || '',
-        id: playlist.id
-      }));
-
-      return res.json(playlistData);
-    } catch (searchError) {
-      console.log('❌ Playlist search failed, using track-based recommendations');
-      
-      // Fallback to track recommendations with mood mapping
-      const moodConfigs = {
-        love: { genres: 'pop,romantic', energy: 0.4, valence: 0.8 },
-        rage: { genres: 'rock,metal', energy: 0.9, valence: 0.3 },
-        optimism: { genres: 'pop,indie-pop', energy: 0.7, valence: 0.8 },
-        joy: { genres: 'dance,pop', energy: 0.8, valence: 0.9 },
-        nostalgia: { genres: 'classic-rock,oldies', energy: 0.5, valence: 0.6 },
-        confident: { genres: 'hip-hop,pop', energy: 0.8, valence: 0.7 },
-        'hyper craze': { genres: 'edm,electronic', energy: 0.9, valence: 0.8 },
-        sad: { genres: 'acoustic,indie', energy: 0.3, valence: 0.2 }
-      };
-
-      const config = moodConfigs[mood] || { genres: 'pop', energy: 0.5, valence: 0.5 };
-
-      try {
-        const recommendations = await req.spotifyApi.getRecommendations({
-          seed_genres: config.genres.split(','),
-          limit: 4,
-          target_energy: config.energy,
-          target_valence: config.valence
-        });
-
-        const tracks = recommendations.body.tracks.map(track => ({
-          title: track.name,
-          artist: track.artists.map(artist => artist.name).join(', '),
-          image: track.album.images[0]?.url || ''
-        }));
-
-        return res.json(tracks);
-      } catch (recError) {
-        console.log('❌ Track recommendations also failed, using final fallback');
-        throw recError; // This will trigger the final fallback
-      }
+    if (!req.user.hasSpotify) {
+      return res.status(400).json({ error: 'Spotify not connected' });
     }
+
+    const token = await getValidSpotifyToken(req.user);
+    
+    // Mock data filtered by mood
+    const moodPlaylists = mockPlaylists.map(playlist => ({
+      ...playlist,
+      title: `${mood.charAt(0).toUpperCase() + mood.slice(1)} ${playlist.title}`
+    }));
+    
+    res.json(moodPlaylists);
     
   } catch (error) {
-    console.error('❌ Mood playlists error:', error);
-    
-    // FINAL FALLBACK - FIXED VARIABLE SCOPE
-    const { mood } = req.body; // Get mood from request body
-    
-    const fallbackPlaylists = [
-      {
-        title: `${mood ? mood.charAt(0).toUpperCase() + mood.slice(1) : 'Study'} Vibes`,
-        artist: "Spotify",
-        image: ""
-      },
-      {
-        title: `Mood: ${mood || 'Focus'}`,
-        artist: "Curated Playlist",
-        image: ""
-      },
-      {
-        title: `${mood || 'Study'} Mix`,
-        artist: "Study Sounds",
-        image: ""
-      },
-      {
-        title: `Focus ${mood || 'Radio'}`,
-        artist: "Productivity Radio",
-        image: ""
-      }
-    ];
-    
-    console.log('✅ Returning final fallback mood playlists');
-    res.json(fallbackPlaylists);
+    console.error('Mood playlists error:', error);
+    res.status(500).json({ error: 'Failed to fetch mood playlists' });
   }
 });
 
-// Get playlists by workload
-router.post('/workload-playlists', authMiddleware, spotifyAuthMiddleware, async (req, res) => {
+// Workload playlists endpoint
+router.post('/workload-playlists', auth, async (req, res) => {
   try {
     const { workload } = req.body;
-    console.log('📚 Fetching workload playlists for:', workload);
-
-    try {
-      // Try to search for playlists
-      const searchTerm = workload === 'heavy' ? 'classical' : 
-                        workload === 'moderate' ? 'focus' : 'chill';
-      
-      const playlists = await req.spotifyApi.searchPlaylists(searchTerm, { limit: 4 });
-      console.log('✅ Workload playlists found:', playlists.body.playlists.items.length);
-
-      const playlistData = playlists.body.playlists.items.map(playlist => ({
-        title: playlist.name,
-        artist: playlist.owner.display_name,
-        image: playlist.images[0]?.url || '',
-        id: playlist.id
-      }));
-
-      return res.json(playlistData);
-    } catch (searchError) {
-      console.log('❌ Playlist search failed, using track-based recommendations');
-      
-      // Fallback to track recommendations
-      const workloadConfigs = {
-        light: { genres: 'chill,lounge', energy: 0.3, valence: 0.7 },
-        moderate: { genres: 'indie-pop,alternative', energy: 0.5, valence: 0.6 },
-        heavy: { genres: 'classical,ambient', energy: 0.2, valence: 0.5 }
-      };
-
-      const config = workloadConfigs[workload] || { genres: 'study', energy: 0.4, valence: 0.5 };
-
-      try {
-        const recommendations = await req.spotifyApi.getRecommendations({
-          seed_genres: config.genres.split(','),
-          limit: 4,
-          target_energy: config.energy,
-          target_valence: config.valence
-        });
-
-        const tracks = recommendations.body.tracks.map(track => ({
-          title: track.name,
-          artist: track.artists.map(artist => artist.name).join(', '),
-          image: track.album.images[0]?.url || ''
-        }));
-
-        return res.json(tracks);
-      } catch (recError) {
-        console.log('❌ Track recommendations also failed, using final fallback');
-        throw recError;
-      }
+    
+    if (!req.user.hasSpotify) {
+      return res.status(400).json({ error: 'Spotify not connected' });
     }
+
+    const token = await getValidSpotifyToken(req.user);
+    
+    // Mock data filtered by workload
+    const workloadPlaylists = mockPlaylists.map(playlist => ({
+      ...playlist,
+      title: `${workload.charAt(0).toUpperCase() + workload.slice(1)} Workload ${playlist.title}`
+    }));
+    
+    res.json(workloadPlaylists);
     
   } catch (error) {
-    console.error('❌ Workload playlists error:', error);
-    
-    // FINAL FALLBACK - FIXED VARIABLE SCOPE
-    const { workload } = req.body;
-    
-    const fallbackPlaylists = [
-      {
-        title: `${workload ? workload.charAt(0).toUpperCase() + workload.slice(1) : 'Study'} Workload Focus`,
-        artist: "Study Beats",
-        image: ""
-      },
-      {
-        title: `${workload || 'Study'} Session`,
-        artist: "Focus Music",
-        image: ""
-      },
-      {
-        title: `Productivity ${workload || 'Mix'}`,
-        artist: "Work Sounds",
-        image: ""
-      },
-      {
-        title: `${workload || 'Deep'} Concentration`,
-        artist: "Ambient Radio",
-        image: ""
-      }
-    ];
-    
-    console.log('✅ Returning final fallback workload playlists');
-    res.json(fallbackPlaylists);
+    console.error('Workload playlists error:', error);
+    res.status(500).json({ error: 'Failed to fetch workload playlists' });
   }
 });
 
-// Get playlists by focus level
-router.post('/focus-playlists', authMiddleware, spotifyAuthMiddleware, async (req, res) => {
+// Focus level playlists endpoint
+router.post('/focus-playlists', auth, async (req, res) => {
   try {
     const { focusLevel, studyHours } = req.body;
-    console.log('🎯 Fetching focus playlists for:', focusLevel, 'hours:', studyHours);
-
-    try {
-      // Try to search for playlists
-      const searchTerm = focusLevel === 'high' ? 'lofi' : 
-                        focusLevel === 'medium' ? 'focus' : 'upbeat';
-      
-      const playlists = await req.spotifyApi.searchPlaylists(searchTerm, { limit: 4 });
-      console.log('✅ Focus playlists found:', playlists.body.playlists.items.length);
-
-      const playlistData = playlists.body.playlists.items.map(playlist => ({
-        title: playlist.name,
-        artist: playlist.owner.display_name,
-        image: playlist.images[0]?.url || '',
-        id: playlist.id
-      }));
-
-      return res.json(playlistData);
-    } catch (searchError) {
-      console.log('❌ Playlist search failed, using track-based recommendations');
-      
-      // Fallback to track recommendations
-      const focusConfigs = {
-        low: { genres: 'upbeat-pop,indie', energy: 0.7, valence: 0.8 },
-        medium: { genres: 'indie,alternative', energy: 0.5, valence: 0.6 },
-        high: { genres: 'classical,ambient,lo-fi', energy: 0.3, valence: 0.5 }
-      };
-
-      const config = focusConfigs[focusLevel] || { genres: 'study', energy: 0.4, valence: 0.5 };
-
-      try {
-        const recommendations = await req.spotifyApi.getRecommendations({
-          seed_genres: config.genres.split(','),
-          limit: 4,
-          target_energy: config.energy,
-          target_valence: config.valence
-        });
-
-        const tracks = recommendations.body.tracks.map(track => ({
-          title: track.name,
-          artist: track.artists.map(artist => artist.name).join(', '),
-          image: track.album.images[0]?.url || ''
-        }));
-
-        return res.json(tracks);
-      } catch (recError) {
-        console.log('❌ Track recommendations also failed, using final fallback');
-        throw recError;
-      }
+    
+    if (!req.user.hasSpotify) {
+      return res.status(400).json({ error: 'Spotify not connected' });
     }
+
+    const token = await getValidSpotifyToken(req.user);
+    
+    // Mock data filtered by focus level
+    const focusPlaylists = mockPlaylists.map(playlist => ({
+      ...playlist,
+      title: `${focusLevel.charAt(0).toUpperCase() + focusLevel.slice(1)} Focus (${studyHours}h) ${playlist.title}`
+    }));
+    
+    res.json(focusPlaylists);
     
   } catch (error) {
-    console.error('❌ Focus playlists error:', error);
-    
-    // FINAL FALLBACK - FIXED VARIABLE SCOPE
-    const { focusLevel, studyHours } = req.body;
-    
-    const fallbackPlaylists = [
-      {
-        title: `${focusLevel ? focusLevel.charAt(0).toUpperCase() + focusLevel.slice(1) : 'Deep'} Focus Mix`,
-        artist: "Study Radio",
-        image: ""
-      },
-      {
-        title: `${focusLevel || 'High'} Concentration`,
-        artist: "Focus Beats",
-        image: ""
-      },
-      {
-        title: `${studyHours || '2'} Hour Study Session`,
-        artist: "Productivity Sounds",
-        image: ""
-      },
-      {
-        title: `${focusLevel || 'Study'} Energy Mix`,
-        artist: "Ambient Focus",
-        image: ""
-      }
-    ];
-    
-    console.log('✅ Returning final fallback focus playlists');
-    res.json(fallbackPlaylists);
-  }
-});
-
-// Add this route for debugging
-router.get('/debug-token', authMiddleware, async (req, res) => {
-  try {
-    console.log('=== DEBUG TOKEN ===');
-    console.log('User:', req.user.username);
-    console.log('Has Spotify ID:', !!req.user.spotifyId);
-    console.log('Has Spotify Token:', !!req.user.spotifyToken);
-    console.log('Has Spotify Refresh Token:', !!req.user.spotifyRefreshToken);
-    
-    if (req.user.spotifyToken) {
-      // Test if token works
-      const spotifyApi = new SpotifyWebApi();
-      spotifyApi.setAccessToken(req.user.spotifyToken);
-      
-      try {
-        const me = await spotifyApi.getMe();
-        console.log('Spotify token valid for user:', me.body.display_name);
-        res.json({ 
-          status: 'valid', 
-          spotifyUser: me.body.display_name,
-          hasToken: true 
-        });
-      } catch (spotifyError) {
-        console.log('Spotify token invalid:', spotifyError.message);
-        res.json({ 
-          status: 'invalid', 
-          error: spotifyError.message,
-          hasToken: true 
-        });
-      }
-    } else {
-      res.json({ status: 'no_token' });
-    }
-  } catch (error) {
-    console.error('Debug error:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// Debug scopes and permissions
-router.get('/debug-scopes', authMiddleware, spotifyAuthMiddleware, async (req, res) => {
-  try {
-    console.log('=== DEBUG SCOPES ===');
-    
-    // Test various endpoints to see what works
-    const tests = {};
-    
-    try {
-      const me = await req.spotifyApi.getMe();
-      tests.getMe = '✅ Works';
-    } catch (e) {
-      tests.getMe = `❌ Failed: ${e.message}`;
-    }
-    
-    try {
-      const recent = await req.spotifyApi.getMyRecentlyPlayedTracks({ limit: 1 });
-      tests.recentlyPlayed = '✅ Works';
-    } catch (e) {
-      tests.recentlyPlayed = `❌ Failed: ${e.message}`;
-    }
-    
-    try {
-      const savedAlbums = await req.spotifyApi.getMySavedAlbums({ limit: 1 });
-      tests.savedAlbums = '✅ Works';
-    } catch (e) {
-      tests.savedAlbums = `❌ Failed: ${e.message}`;
-    }
-    
-    try {
-      const topTracks = await req.spotifyApi.getMyTopTracks({ limit: 1 });
-      tests.topTracks = '✅ Works';
-    } catch (e) {
-      tests.topTracks = `❌ Failed: ${e.message}`;
-    }
-    
-    console.log('Scope test results:', tests);
-    res.json({ tests });
-    
-  } catch (error) {
-    console.error('Scope debug error:', error);
-    res.status(500).json({ error: error.message });
+    console.error('Focus playlists error:', error);
+    res.status(500).json({ error: 'Failed to fetch focus playlists' });
   }
 });
 

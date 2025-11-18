@@ -54,7 +54,7 @@ const Activity = () => {
   const getRecommendationReason = (sectionType) => {
     switch(sectionType) {
       case 'recentlyPlayed':
-        return 'Based on your recently played tracks';
+        return 'Based on your recently played playlists';
       case 'likedAlbums':
         return 'Featuring songs from your liked albums';
       case 'recommendations':
@@ -120,18 +120,18 @@ const Activity = () => {
       <section className="activity-section">
         <h2>New songs we think you might like</h2>
         <div className="playlist-cards">
-          {recommendations.map((track, index) => (
+          {recommendations.map((playlist, index) => (
             <div 
               key={index} 
               className="playlist-card"
-              onClick={() => handlePlaylistClick(track, 'recommendations')}
+              onClick={() => handlePlaylistClick(playlist, 'recommendations')}
             >
-              <div className="card-image" style={{ backgroundImage: `url(${track.image})` }}>
-                {!track.image && <div className="image-placeholder">🎵</div>}
+              <div className="card-image" style={{ backgroundImage: `url(${playlist.image})` }}>
+                {!playlist.image && <div className="image-placeholder">🎵</div>}
               </div>
               <div className="card-content">
-                <h3>{track.title}</h3>
-                <p>{track.artist}</p>
+                <h3>{playlist.title}</h3>
+                <p>{playlist.artist}</p>
               </div>
             </div>
           ))}
