@@ -39,6 +39,17 @@ const Workload = () => {
     setSelectedWorkload(workload);
   };
 
+  const handlePlaylistClick = (playlist) => {
+    navigate('/playlist-view', { 
+      state: { 
+        playlist,
+        sectionType: 'workload',
+        recommendationReason: `Optimized for ${selectedWorkload} workload`,
+        moodColor: getWorkloadColor(selectedWorkload)
+      }
+    });
+  };
+
   const getWorkloadColor = (workloadName) => {
     const workload = workloads.find(w => w.name === workloadName);
     return workload ? workload.color : '#ccc'; // Default to white if mood not found
@@ -52,7 +63,7 @@ const Workload = () => {
           {workloads.map((workload, index) => (
             <button
               key={index}
-              className="workload-button"
+              className={`workload-button ${selectedWorkload === workload.name ? 'active' : ''}`}
               style={{ backgroundColor: workload.color }}
               onClick={() => handleWorkloadClick(workload.name)}
             >
@@ -63,7 +74,7 @@ const Workload = () => {
       </section>
       {selectedWorkload && (
         <section className="playlist-section">
-          <h2>Playlists based on your workload</h2>
+          <h2>Playlists for your {selectedWorkload} workload</h2>
           {error && (
             <p className="error">
               {error}{' '}
@@ -74,9 +85,15 @@ const Workload = () => {
           )}
           <div className="playlist-cards">
             {playlists.map((playlist, index) => (
-              <div key={index} className="playlist-card">
-                <div className="card-image" style={{ backgroundImage: `url(${playlist.image})` }}></div>
-                <div className="card-content" style={{ backgroundColor: getWorkloadColor(selectedWorkload) }}>
+              <div 
+                key={index} 
+                className="playlist-card"
+                onClick={() => handlePlaylistClick(playlist)}
+              >
+                <div className="card-image" style={{ backgroundImage: `url(${playlist.image})` }}>
+                  {!playlist.image && <div className="image-placeholder">🎵</div>}
+                </div>
+                <div className="card-content" style={{ backgroundColor: getWorkloadColor(selectedWorkload) + '40' }}>
                   <h3>{playlist.title}</h3>
                   <p>{playlist.artist}</p>
                 </div>

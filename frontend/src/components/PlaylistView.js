@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import './PlaylistView.css';
@@ -7,25 +7,42 @@ const PlaylistView = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { playlist, sectionType, recommendationReason, moodColor } = location.state || {};
+  const [tracks, setTracks] = useState([]);
   const [isSaving, setIsSaving] = useState(false);
   const [saveStatus, setSaveStatus] = useState('');
+  const [isLoadingTracks, setIsLoadingTracks] = useState(true);
 
-  // Mock data for demonstration - in real app, you'd fetch this from Spotify API
-  const mockTracks = [
-    { name: "Study Session", artist: "Lo-Fi Beats", duration: "3:45" },
-    { name: "Deep Focus", artist: "Ambient Study", duration: "4:20" },
-    { name: "Concentration Flow", artist: "Chillhop", duration: "3:15" },
-    { name: "Productivity Boost", artist: "Focus Music", duration: "5:10" },
-    { name: "Mindful Coding", artist: "Study Vibes", duration: "3:55" }
-  ];
+  useEffect(() => {
+    if (playlist?.id) {
+      fetchPlaylistTracks();
+    } else {
+      setIsLoadingTracks(false);
+    }
+  }, [playlist]);
 
-  const totalDuration = "20:25"; // Mock total duration
+  const fetchPlaylistTracks = async () => {
+    const token = localStorage.getItem('jwt_token');
+    if (!token) return;
+
+    try {
+      setIsLoadingTracks(true);
+      const response = await axios.get(
+        `http://localhost:5000/api/spotify/playlist/${playlist.id}/tracks`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      setTracks(response.data);
+    } catch (error) {
+      console.error('Failed to fetch tracks:', error);
+      // Use mock tracks if API fails
+      setTracks(playlist.tracks || []);
+    } finally {
+      setIsLoadingTracks(false);
+    }
+  };
 
   const handleSaveToSpotify = async () => {
     const token = localStorage.getItem('jwt_token');
-    const spotifyToken = localStorage.getItem('spotify_token');
-    
-    if (!token || !spotifyToken) {
+    if (!token) {
       setSaveStatus('Please connect your Spotify account first');
       setTimeout(() => setSaveStatus(''), 3000);
       return;
@@ -35,15 +52,25 @@ const PlaylistView = () => {
     setSaveStatus('Saving to Spotify...');
 
     try {
-      // In a real implementation, you would:
-      // 1. Create a new playlist in the user's Spotify account
-      // 2. Add the tracks to the playlist
+      const response = await axios.post(
+        'http://localhost:5000/api/spotify/save-playlist',
+        {
+          playlistUrl: playlist.external_url,
+          name: playlist.title,
+          description: `${playlist.description} - ${recommendationReason}`,
+          tracks: tracks
+        },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      if (response.data.spotify_url) {
+        // Open Spotify URL in new tab
+        window.open(response.data.spotify_url, '_blank');
+        setSaveStatus('✅ Opening Spotify...');
+      } else {
+        setSaveStatus('✅ Playlist saved!');
+      }
       
-      // For now, we'll simulate the API call
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      
-      // Mock successful save
-      setSaveStatus('✅ Playlist saved to Spotify!');
       setTimeout(() => setSaveStatus(''), 3000);
       
     } catch (error) {
@@ -55,35 +82,10 @@ const PlaylistView = () => {
     }
   };
 
-  const createSpotifyPlaylist = async (playlistName, trackUris) => {
-    // This is where you would implement the actual Spotify API calls:
-    
-    // 1. Get current user's Spotify ID
-    // const userResponse = await axios.get('https://api.spotify.com/v1/me', {
-    //   headers: { Authorization: `Bearer ${spotifyToken}` }
-    // });
-    // const userId = userResponse.data.id;
-    
-    // 2. Create a new playlist
-    // const playlistResponse = await axios.post(
-    //   `https://api.spotify.com/v1/users/${userId}/playlists`,
-    //   {
-    //     name: playlistName,
-    //     description: `Created via StudySound - ${recommendationReason}`,
-    //     public: false
-    //   },
-    //   { headers: { Authorization: `Bearer ${spotifyToken}` } }
-    // );
-    // const playlistId = playlistResponse.data.id;
-    
-    // 3. Add tracks to the playlist
-    // await axios.post(
-    //   `https://api.spotify.com/v1/playlists/${playlistId}/tracks`,
-    //   { uris: trackUris },
-    //   { headers: { Authorization: `Bearer ${spotifyToken}` } }
-    // );
-    
-    return true; // Mock success
+  const openInSpotify = () => {
+    if (playlist.external_url) {
+      window.open(playlist.external_url, '_blank');
+    }
   };
 
   if (!playlist) {
@@ -97,10 +99,12 @@ const PlaylistView = () => {
     );
   }
 
+  const displayTracks = tracks.length > 0 ? tracks : (playlist.tracks || []);
+
   return (
     <div className="playlist-view">
-      <button className="back-button" onClick={() => navigate(sectionType === 'mood' ? '/mood' : '/activity')}>
-        ← Back to {sectionType === 'mood' ? 'Mood' : 'Activity'}
+      <button className="back-button" onClick={() => navigate(-1)}>
+        ← Back
       </button>
 
       <div className="playlist-header">
@@ -119,17 +123,17 @@ const PlaylistView = () => {
           <p className="playlist-artist">{playlist.artist}</p>
           <div className="playlist-meta">
             <span className="meta-item">
-              <strong>{mockTracks.length}</strong> songs
+              <strong>{displayTracks.length}</strong> songs
             </span>
             <span className="meta-item">
-              <strong>{totalDuration}</strong> total
+              <strong>{Math.round(displayTracks.reduce((acc, track) => acc + (track.duration || 180000), 0) / 60000)}</strong> min
             </span>
             {moodColor && (
               <span 
                 className="mood-indicator"
                 style={{ backgroundColor: moodColor }}
               >
-                Mood Playlist
+                AI Generated
               </span>
             )}
           </div>
@@ -137,7 +141,6 @@ const PlaylistView = () => {
             <span className="reason-badge">{recommendationReason}</span>
           </div>
           
-          {/* Save to Spotify Button */}
           <div className="action-buttons">
             <button 
               className={`save-to-spotify-btn ${isSaving ? 'saving' : ''}`}
@@ -156,6 +159,17 @@ const PlaylistView = () => {
                 </>
               )}
             </button>
+            
+            {playlist.external_url && (
+              <button 
+                className="open-spotify-btn"
+                onClick={openInSpotify}
+              >
+                <span className="spotify-icon">🔗</span>
+                Open in Spotify
+              </button>
+            )}
+            
             {saveStatus && (
               <div className={`save-status ${saveStatus.includes('✅') ? 'success' : 'error'}`}>
                 {saveStatus}
@@ -168,18 +182,24 @@ const PlaylistView = () => {
       <div className="playlist-details">
         <div className="tracks-section">
           <h2>Tracks</h2>
-          <div className="tracks-list">
-            {mockTracks.map((track, index) => (
-              <div key={index} className="track-item">
-                <div className="track-number">{index + 1}</div>
-                <div className="track-info">
-                  <div className="track-name">{track.name}</div>
-                  <div className="track-artist">{track.artist}</div>
+          {isLoadingTracks ? (
+            <div className="loading-tracks">Loading tracks...</div>
+          ) : (
+            <div className="tracks-list">
+              {displayTracks.map((track, index) => (
+                <div key={track.id || index} className="track-item">
+                  <div className="track-number">{index + 1}</div>
+                  <div className="track-info">
+                    <div className="track-name">{track.title}</div>
+                    <div className="track-artist">{track.artist}</div>
+                  </div>
+                  <div className="track-duration">
+                    {track.duration_formatted || track.duration || '3:45'}
+                  </div>
                 </div>
-                <div className="track-duration">{track.duration}</div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
 
         <div className="playlist-insights">
@@ -187,9 +207,9 @@ const PlaylistView = () => {
           <div className="insight-card">
             <p>{recommendationReason}</p>
             <ul className="insight-list">
-              <li>Perfect for focused study sessions</li>
-              <li>Matches your recent listening patterns</li>
-              <li>Curated based on your preferences</li>
+              <li>AI-generated based on your preferences</li>
+              <li>Personalized using Spotify's recommendation engine</li>
+              <li>Curated to match your current needs</li>
             </ul>
           </div>
           
@@ -197,25 +217,26 @@ const PlaylistView = () => {
             <h3>Playlist Stats</h3>
             <div className="stats-grid">
               <div className="stat">
-                <div className="stat-value">{mockTracks.length}</div>
+                <div className="stat-value">{displayTracks.length}</div>
                 <div className="stat-label">Tracks</div>
               </div>
               <div className="stat">
-                <div className="stat-value">{totalDuration}</div>
-                <div className="stat-label">Duration</div>
+                <div className="stat-value">
+                  {Math.round(displayTracks.reduce((acc, track) => acc + (track.duration || 180000), 0) / 60000)}
+                </div>
+                <div className="stat-label">Minutes</div>
               </div>
               <div className="stat">
-                <div className="stat-value">Study</div>
-                <div className="stat-label">Focus</div>
+                <div className="stat-value">AI</div>
+                <div className="stat-label">Generated</div>
               </div>
             </div>
           </div>
 
-          {/* Spotify Integration Info */}
           <div className="spotify-info">
             <h3>Save to Your Library</h3>
             <div className="info-card">
-              <p>Save this playlist to your Spotify account to listen anytime:</p>
+              <p>This playlist has been created in your Spotify account. Save it to your library to listen anytime:</p>
               <ul className="benefits-list">
                 <li>🎵 Access across all your devices</li>
                 <li>📱 Listen offline with Spotify Premium</li>
