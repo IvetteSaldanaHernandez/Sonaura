@@ -554,7 +554,7 @@ async function getPersonalizedRecommendations(token) {
 
   } catch (error) {
     console.error('Personalized recommendations failed:', error.message);
-    return await getSearchFallbackPlaylists(token, 'study playlist', 1);
+    return await getSearchFallbackPlaylists(token, 'study playlist', 4);
   }
 }
 
@@ -583,7 +583,7 @@ async function getMoodRecommendations(token, mood) {
       sad: 'acoustic'
     };
 
-    const query = moodMap[mood] || 'chill';
+    const query = moodMap[mood];
     const params = new URLSearchParams({
       limit: '20',
       seed_genres: query,
@@ -603,11 +603,11 @@ async function getMoodRecommendations(token, mood) {
     const fullTracks = response.data.tracks.map(formatTrack).filter(Boolean);
 
     return [{
-      id: `mood-${mood || 'chill'}`,
-      title: `${(mood || 'chill').charAt(0).toUpperCase() + (mood || 'chill').slice(1)} Vibes`,
+      id: `mood-${mood}`,
+      title: `${(mood).charAt(0).toUpperCase() + (mood).slice(1)} Vibes`,
       artist: 'StudySound',
       image: 'https://images.unsplash.com/photo-1511379938547-c1f69419868d?w=500',
-      description: `Perfect background for ${mood || 'chill'} moods`,
+      description: `Perfect background for ${mood} moods`,
       tracks: fullTracks.slice(0, 6),
       fullTracks: fullTracks
     }];
@@ -615,16 +615,16 @@ async function getMoodRecommendations(token, mood) {
   } catch (error) {
     console.error('Mood recommendations failed:', error.message);
     const moodMap = {
-      love: 'romantic study',
-      rage: 'intense focus', 
-      optimism: 'upbeat study',
-      joy: 'happy instrumental',
-      nostalgia: 'vintage study',
-      confident: 'powerful focus',
-      'hyper craze': 'energetic electronic',
-      sad: 'calm piano'
+      love: 'love songs',
+      rage: 'intense rage', 
+      optimism: 'optimistic pop',
+      joy: 'bedroom pop',
+      nostalgia: 'vintage nostalgia',
+      confident: 'powerful confidence',
+      'hyper craze': 'girly techno pop',
+      sad: 'sad angst'
     };
-    const query = moodMap[mood] || 'study focus';
+    const query = moodMap[mood] || 'for me';
     return await getSearchFallbackPlaylists(token, query, 4);
   }
 }
@@ -684,11 +684,11 @@ async function getWorkloadRecommendations(token, workload = 'moderate') {
   } catch (error) {
     console.error('Workload recommendations failed:', error.message);
     const workloadMap = {
-      light: 'upbeat pop',
-      moderate: 'chill rnb', 
-      heavy: 'focus classical'
+      light: 'girly pop',
+      moderate: 'rnb playlist', 
+      heavy: 'instrumental'
     };
-    const query = workloadMap[workload] || 'study';
+    const query = workloadMap[workload];
     return await getSearchFallbackPlaylists(token, query, 4);
   }
 }
@@ -749,9 +749,9 @@ async function getFocusRecommendations(token, focusLevel, studyHours) {
     const focusMap = {
       low: 'rnb smooth',
       medium: 'classical jazz',
-      high: 'deep work ambient'
+      high: 'adhd'
     };
-    const query = focusMap[focusLevel] || 'study focus';
+    const query = focusMap[focusLevel];
     return await getSearchFallbackPlaylists(token, query, 4);
   }
 }
