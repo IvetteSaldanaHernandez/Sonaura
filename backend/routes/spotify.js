@@ -211,9 +211,7 @@ router.post('/connect', auth, async (req, res) => {
 async function getValidSpotifyToken(user) {
   try {
     await axios.get('https://api.spotify.com/v1/me', {
-      headers: {
-        'Authorization': `Bearer ${user.spotifyAccessToken}`
-      }
+      headers: { 'Authorization': `Bearer ${user.spotifyAccessToken}` }
     });
     return user.spotifyAccessToken;
   } catch (error) {
@@ -234,11 +232,7 @@ async function refreshSpotifyToken(user) {
         client_id: process.env.SPOTIFY_CLIENT_ID,
         client_secret: process.env.SPOTIFY_CLIENT_SECRET
       }),
-      {
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded'
-        }
-      }
+      { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
     );
 
     user.spotifyAccessToken = response.data.access_token;
@@ -254,16 +248,58 @@ async function refreshSpotifyToken(user) {
   }
 }
 
+//Fetch ALL tracks from a Spotify playlist
+async function fetchAllPlaylistTracks(token, playlistId, maxTracks = 200) {
+  let allTracks = [];
+  let nextUrl = `https://api.spotify.com/v1/playlists/${playlistId}/tracks`;
+  
+  while (nextUrl && allTracks.length < maxTracks) {
+    const response = await axios.get(nextUrl, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+
+    const batchTracks = response.data.items
+      .map(item => item.track ? formatTrack(item.track) : null)
+      .filter(track => track !== null);
+    
+    allTracks = [...allTracks, ...batchTracks];
+    nextUrl = response.data.next;
+    
+    if (!nextUrl || allTracks.length >= maxTracks) break;
+  }
+
+  return allTracks;
+}
+
+// Fetch ALL tracks from a Spotify album
+async function fetchAllAlbumTracks(token, albumId, maxTracks = 200) {
+  let allTracks = [];
+  let nextUrl = `https://api.spotify.com/v1/albums/${albumId}/tracks`;
+  
+  while (nextUrl && allTracks.length < maxTracks) {
+    const response = await axios.get(nextUrl, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+
+    const batchTracks = response.data.items
+      .map(track => formatTrack(track))
+      .filter(track => track !== null);
+    
+    allTracks = [...allTracks, ...batchTracks];
+    nextUrl = response.data.next;
+    
+    if (!nextUrl || allTracks.length >= maxTracks) break;
+  }
+
+  return allTracks;
+}
+
 // Get user's recently played playlists
 async function getUserRecentlyPlayedPlaylists(token, limit = 4) {
   try {
     const recentlyPlayedResponse = await axios.get(
       `https://api.spotify.com/v1/me/player/recently-played?limit=10`,
-      {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      }
+      { headers: { 'Authorization': `Bearer ${token}` } }
     );
 
     // Extract unique playlist IDs from recently played tracks
@@ -280,30 +316,22 @@ async function getUserRecentlyPlayedPlaylists(token, limit = 4) {
         try {
           const playlistResponse = await axios.get(
             `https://api.spotify.com/v1/playlists/${playlistId}`,
-            {
-              headers: {
-                'Authorization': `Bearer ${token}`
-              }
-            }
+            { headers: { 'Authorization': `Bearer ${token}` } }
           );
           
-          // Get tracks from the playlist
-          const tracksResponse = await axios.get(
-            // `https://api.spotify.com/v1/playlists/${playlistId}/tracks?limit=4`,
-            `https://api.spotify.com/v1/playlists/${playlistId}/tracks`,
-            {
-              headers: {
-                'Authorization': `Bearer ${token}`
-              }
-            }
-          );
+          // Get ALL tracks from the playlist
+          const tracks = await fetchAllPlaylistTracks(token, playlistId);
 
-          const tracks = tracksResponse.data.items
-            // .slice(0, 4)
-            .map(item => formatTrack(item.track))
-            .filter(track => track !== null);
-
-          return formatPlaylist(playlistResponse.data, tracks);
+          return {
+            id: playlistResponse.data.id,
+            title: playlistResponse.data.name || 'Unknown Playlist',
+            artist: playlistResponse.data.owner?.display_name || 'Spotify',
+            image: playlistResponse.data.images?.[0]?.url || null,
+            description: playlistResponse.data.description || '',
+            uri: playlistResponse.data.uri || '',
+            external_url: playlistResponse.data.external_urls?.spotify || '',
+            tracks: tracks // ALL tracks
+          };
         } catch (error) {
           console.error(`Error fetching playlist ${playlistId}:`, error.message);
           return null;
@@ -323,11 +351,7 @@ async function getUserLikedAlbumsPlaylists(token, limit = 4) {
   try {
     const savedAlbumsResponse = await axios.get(
       `https://api.spotify.com/v1/me/albums?limit=${limit}`,
-      {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      }
+      { headers: { 'Authorization': `Bearer ${token}` } }
     );
 
     const albumPlaylists = await Promise.all(
@@ -335,17 +359,8 @@ async function getUserLikedAlbumsPlaylists(token, limit = 4) {
         const album = item.album;
         
         try {
-          // Get first batch of tracks for preview (6 tracks)
-          const tracksResponse = await axios.get(
-            `https://api.spotify.com/v1/albums/${album.id}/tracks?limit=6`,
-            {
-              headers: { Authorization: `Bearer ${token}` }
-            }
-          );
-
-          const tracks = tracksResponse.data.items
-            .map(formatTrack)
-            .filter(track => track !== null);
+          // Get ALL tracks from the album
+          const tracks = await fetchAllAlbumTracks(token, album.id);
 
           return {
             id: `album-${album.id}`,
@@ -353,11 +368,10 @@ async function getUserLikedAlbumsPlaylists(token, limit = 4) {
             artist: album.artists.map(a => a.name).join(', '),
             image: album.images?.[0]?.url || null,
             description: `Album • ${album.release_date?.split('-')[0] || 'Unknown Year'}`,
-            tracks, // now properly formatted with title, image, preview_url, etc.
-            type: 'album' // optional flag if your frontend uses it
+            tracks: tracks // ALL tracks
           };
         } catch (err) {
-          console.error(`Failed to load tracks for album ${album.id}`);
+          console.error(`Failed to load tracks for album ${album.id}:`, err.message);
           return null;
         }
       })
@@ -370,62 +384,25 @@ async function getUserLikedAlbumsPlaylists(token, limit = 4) {
   }
 }
 
-// Search fallback for playlists
-async function getSearchFallbackPlaylists(token, query = 'study focus', limit = 4) {
+// Search for playlists and get ALL tracks
+async function getSearchFallbackPlaylists(token, query = 'study', limit = 4) {
   try {
-    console.log('Searching for playlists with query:', query);
-    
-    // Search for real playlists
     const response = await axios.get(
       `https://api.spotify.com/v1/search?q=${encodeURIComponent(query)}&type=playlist&limit=${limit}&market=US`,
-      {
-        headers: { 
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      }
+      { headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' } }
     );
 
-    console.log('Search response received:', response.data);
-
-    // Check if we have valid playlist data
-    if (!response.data || !response.data.playlists || !response.data.playlists.items) {
-      console.log('No valid playlist data in response');
-      throw new Error('Invalid response structure from Spotify');
-    }
-
-    const playlistItems = response.data.playlists.items;
-    console.log('Playlists found:', playlistItems.length);
-
-    if (playlistItems.length === 0) {
-      throw new Error('No playlists found in search results');
+    if (!response.data?.playlists?.items || response.data.playlists.items.length === 0) {
+      throw new Error('No playlists found');
     }
 
     const playlists = await Promise.all(
-      playlistItems.slice(0, limit).map(async (playlist, index) => {
-        // Check if playlist is null or missing required fields
-        if (!playlist || !playlist.id) {
-          console.log(`Skipping invalid playlist at index ${index}:`, playlist);
-          return null;
-        }
+      response.data.playlists.items.slice(0, limit).map(async (playlist) => {
+        if (!playlist?.id) return null;
 
         try {
-          console.log(`Loading tracks for playlist: ${playlist.id} - ${playlist.name}`);
-          
-          // Get a few tracks for preview
-          const tracksResponse = await axios.get(
-            `https://api.spotify.com/v1/playlists/${playlist.id}/tracks?limit=6`,
-            {
-              headers: { 
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json'
-              }
-            }
-          );
-
-          const tracks = tracksResponse.data.items
-            .map(item => item && item.track ? formatTrack(item.track) : null)
-            .filter(track => track !== null);
+          // Get ALL tracks from the playlist
+          const tracks = await fetchAllPlaylistTracks(token, playlist.id);
 
           return {
             id: playlist.id,
@@ -435,114 +412,124 @@ async function getSearchFallbackPlaylists(token, query = 'study focus', limit = 
             description: playlist.description || `Curated ${query} playlist`,
             uri: playlist.uri || '',
             external_url: playlist.external_urls?.spotify || '',
-            tracks: tracks.slice(0, 6)
+            tracks: tracks // ALL tracks
           };
         } catch (err) {
           console.error(`Failed to load tracks for playlist ${playlist.id}:`, err.message);
-          // Return playlist without tracks if we can't load them
-          return {
-            id: playlist.id,
-            title: playlist.name || 'Unknown Playlist',
-            artist: playlist.owner?.display_name || 'Spotify',
-            image: playlist.images?.[0]?.url || null,
-            description: playlist.description || `Curated ${query} playlist`,
-            uri: playlist.uri || '',
-            external_url: playlist.external_urls?.spotify || '',
-            tracks: []
-          };
+          return null;
         }
       })
     );
 
     const validPlaylists = playlists.filter(playlist => playlist !== null);
-    console.log(`Returning ${validPlaylists.length} valid playlists`);
     
-    if (validPlaylists.length === 0) {
-      throw new Error('No valid playlists could be created');
+    // Ensure we return exactly limit playlists
+    if (validPlaylists.length >= limit) {
+      return validPlaylists.slice(0, limit);
     }
     
-    return validPlaylists;
+    // If we need more playlists, use mock data as fallback
+    const needed = limit - validPlaylists.length;
+    const mockPlaylistsToAdd = mockPlaylists.slice(0, needed).map((mock, index) => ({
+      ...mock,
+      id: `mock-${index}`,
+      tracks: []
+    }));
+    
+    return [...validPlaylists, ...mockPlaylistsToAdd].slice(0, limit);
 
   } catch (error) {
-    console.error('Search fallback failed:', error.response?.data || error.message);
-    
-    // Ultimate fallback - use a simple track search and create virtual playlists
-    return await getTrackSearchFallback(token, query, limit);
+    console.error('Search fallback failed:', error.message);
+    return mockPlaylists.slice(0, limit).map((mock, index) => ({
+      ...mock,
+      id: `mock-fallback-${index}`,
+      tracks: []
+    }));
   }
 }
 
-// Also update the track search fallback to be more robust:
-async function getTrackSearchFallback(token, query = 'study focus', limit = 4) {
+// Get playlist tracks - fetches ALL tracks with proper pagination
+router.get('/playlist/:id/tracks', auth, async (req, res) => {
   try {
-    console.log('Using track search fallback for:', query);
-    
-    const response = await axios.get(
-      `https://api.spotify.com/v1/search?q=${encodeURIComponent(query)}&type=track&limit=30&market=US`,
-      {
-        headers: { 
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      }
-    );
+    const { id } = req.params;
+    const token = await getValidSpotifyToken(req.user);
 
-    // Check if we have valid track data
-    if (!response.data || !response.data.tracks || !response.data.tracks.items) {
-      throw new Error('Invalid track data from Spotify');
-    }
-
-    const tracks = response.data.tracks.items
-      .map(track => track ? formatTrack(track) : null)
-      .filter(track => track !== null);
-    
-    console.log('Tracks found:', tracks.length);
-    
-    if (tracks.length === 0) {
-      throw new Error('No tracks found');
-    }
-
-    // Create virtual playlists from tracks
-    const playlists = [];
-    const tracksPerPlaylist = Math.min(6, Math.floor(tracks.length / limit));
-    
-    for (let i = 0; i < limit && i * tracksPerPlaylist < tracks.length; i++) {
-      const startIdx = i * tracksPerPlaylist;
-      const playlistTracks = tracks.slice(startIdx, startIdx + tracksPerPlaylist);
+    // Handle virtual album playlists
+    if (id.startsWith('album-')) {
+      const albumId = id.slice(6);
+      const tracks = await fetchAllAlbumTracks(token, albumId);
       
-      if (playlistTracks.length > 0) {
-        playlists.push({
-          id: `search-${query.replace(/\s+/g, '-')}-${i}`,
-          title: `${query.charAt(0).toUpperCase() + query.slice(1)} ${i + 1}`,
-          artist: 'StudySound',
-          image: playlistTracks[0]?.image || 'https://images.unsplash.com/photo-1511379938547-c1f69419868d?w=300',
-          description: `Curated ${query} music`,
-          tracks: playlistTracks,
-          fullTracks: playlistTracks
-        });
-      }
+      // Apply pagination
+      const offset = parseInt(req.query.offset) || 0;
+      const limit = parseInt(req.query.limit);
+      const paginatedTracks = tracks.slice(offset, offset + limit);
+
+      return res.json({
+        tracks: paginatedTracks,
+        total: tracks.length,
+        limit,
+        offset
+      });
     }
 
-    console.log(`Created ${playlists.length} virtual playlists from track search`);
+    // Normal Spotify playlist - get ALL tracks
+    const tracks = await fetchAllPlaylistTracks(token, id);
     
-    if (playlists.length === 0) {
-      throw new Error('Could not create any playlists from tracks');
-    }
-    
-    return playlists;
+    // Apply pagination
+    const offset = parseInt(req.query.offset) || 0;
+    const limit = parseInt(req.query.limit);
+    const paginatedTracks = tracks.slice(offset, offset + limit);
+
+    res.json({
+      tracks: paginatedTracks,
+      total: tracks.length,
+      limit,
+      offset
+    });
 
   } catch (error) {
-    console.error('Track search fallback also failed:', error.message);
-    console.log('Using mock data as final fallback');
-    return mockPlaylists.slice(0, limit);
+    console.error('Playlist tracks error:', error.response?.data || error.message);
+    res.status(500).json({ error: 'Failed to fetch tracks' });
   }
-}
+});
 
-// Update the recommendation functions to handle errors better:
+// Recently played - returns user's actual recently played playlists
+router.get('/recently-played', auth, async (req, res) => {
+  try {
+    if (!req.user.hasSpotify) {
+      return res.status(400).json({ error: 'Spotify not connected' });
+    }
+
+    const token = await getValidSpotifyToken(req.user);
+    const playlists = await getUserRecentlyPlayedPlaylists(token);
+    res.json(playlists);
+    
+  } catch (error) {
+    console.error('Recently played error:', error.message);
+    res.json(mockPlaylists);
+  }
+});
+
+// Liked albums - returns playlists created from user's saved albums
+router.get('/liked-albums', auth, async (req, res) => {
+  try {
+    if (!req.user.hasSpotify) {
+      return res.status(400).json({ error: 'Spotify not connected' });
+    }
+
+    const token = await getValidSpotifyToken(req.user);
+    const playlists = await getUserLikedAlbumsPlaylists(token);
+    res.json(playlists);
+    
+  } catch (error) {
+    console.error('Liked albums error:', error.message);
+    res.json(mockPlaylists);
+  }
+});
+
+// Recommendations
 async function getPersonalizedRecommendations(token) {
   try {
-    console.log('Attempting personalized recommendations...');
-    
-    // Simple test - just use genres with basic params
     const params = new URLSearchParams({
       limit: '20',
       seed_genres: 'study,ambient,chill',
@@ -551,17 +538,10 @@ async function getPersonalizedRecommendations(token) {
 
     const response = await axios.get(
       `https://api.spotify.com/v1/recommendations?${params}`,
-      {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      }
+      { headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' } }
     );
 
-    console.log('Recommendations API success, tracks:', response.data.tracks.length);
-
-    const fullTracks = response.data.tracks.map(formatTrack).filter(Boolean);
+    const tracks = response.data.tracks.map(formatTrack).filter(Boolean);
 
     return [{
       id: 'personalized-recommendations',
@@ -569,19 +549,27 @@ async function getPersonalizedRecommendations(token) {
       artist: 'StudySound',
       image: 'https://images.unsplash.com/photo-1511379938547-c1f69419868d?w=500',
       description: 'Personalized focus music',
-      tracks: fullTracks.slice(0, 6),
-      fullTracks: fullTracks
+      tracks: tracks // ALL tracks
     }];
 
   } catch (error) {
-    console.error('Personalized recommendations failed:', error.response?.data || error.message);
-    console.log('Using search fallback for personalized recommendations');
-    // Return 4 real playlists from search
-    return await getSearchFallbackPlaylists(token, 'study focus concentration', 4);
+    console.error('Personalized recommendations failed:', error.message);
+    return await getSearchFallbackPlaylists(token, 'study playlist', 1);
   }
 }
 
-// Update other recommendation functions similarly - remove complex logic:
+router.get('/recommendations', auth, async (req, res) => {
+  try {
+    if (!req.user.hasSpotify) return res.status(400).json({ error: 'Spotify not connected' });
+    const token = await getValidSpotifyToken(req.user);
+    const result = await getPersonalizedRecommendations(token);
+    res.json(result);
+  } catch (error) {
+    console.error('Recommendations error:', error.message);
+    res.json(mockPlaylists.slice(0, 1));
+  }
+});
+
 async function getMoodRecommendations(token, mood) {
   try {
     const moodMap = {
@@ -641,6 +629,20 @@ async function getMoodRecommendations(token, mood) {
   }
 }
 
+// Mood playlists - returns mood-based recommendations
+router.post('/mood-playlists', auth, async (req, res) => {
+  try {
+    const { mood } = req.body;
+    if (!req.user.hasSpotify) return res.status(400).json({ error: 'Spotify not connected' });
+    const token = await getValidSpotifyToken(req.user);
+    const result = await getMoodRecommendations(token, mood);
+    res.json(result);
+  } catch (error) {
+    console.error('Mood playlists error:', error.message);
+    res.json([mockPlaylists[0]]);
+  }
+});
+
 // Similar simple updates for getWorkloadRecommendations and getFocusRecommendations...
 async function getWorkloadRecommendations(token, workload = 'moderate') {
   try {
@@ -691,6 +693,20 @@ async function getWorkloadRecommendations(token, workload = 'moderate') {
   }
 }
 
+// Workload playlists - returns workload-based recommendations
+router.post('/workload-playlists', auth, async (req, res) => {
+  try {
+    const { workload } = req.body;
+    if (!req.user.hasSpotify) return res.status(400).json({ error: 'Spotify not connected' });
+    const token = await getValidSpotifyToken(req.user);
+    const result = await getWorkloadRecommendations(token, workload);
+    res.json(result);
+  } catch (error) {
+    console.error('Workload playlists error:', error.message);
+    res.json([mockPlaylists[0]]);
+  }
+});
+
 async function getFocusRecommendations(token, focusLevel, studyHours) {
   try {
     const focusMap = {
@@ -740,147 +756,6 @@ async function getFocusRecommendations(token, focusLevel, studyHours) {
   }
 }
 
-// get playlist tracks
-router.get('/playlist/:id/tracks', auth, async (req, res) => {
-  try {
-    const { id } = req.params;
-    const token = await getValidSpotifyToken(req.user);
-
-    // Handle virtual playlists (return empty tracks)
-    if (id.startsWith('mock-') || id.startsWith('personalized') || 
-        id.startsWith('mood-') || id.startsWith('workload-') || 
-        id.includes('-focus-') || id === 'search-fallback' || id === 'fallback') {
-      return res.json({ tracks: [], total: 0 });
-    }
-
-    // Handle virtual album playlists
-    if (id.startsWith('album-')) {
-      // const albumId = id.slice(6);
-      const limit = parseInt(req.query.limit) || 50;
-      const offset = parseInt(req.query.offset) || 0;
-
-      const response = await axios.get(
-        `https://api.spotify.com/v1/albums/${albumId}/tracks`,
-        {
-          params: { limit, offset },
-          headers: { Authorization: `Bearer ${token}` }
-        }
-      );
-
-      const tracks = response.data.items.map(formatTrack).filter(Boolean);
-
-      return res.json({
-        tracks,
-        total: response.data.total,
-        limit,
-        offset
-      });
-    }
-
-    // Normal Spotify playlist
-    const limit = parseInt(req.query.limit) || 50;
-    const offset = parseInt(req.query.offset) || 0;
-
-    const response = await axios.get(
-      `https://api.spotify.com/v1/playlists/${id}/tracks`,
-      {
-        params: { limit, offset },
-        headers: { Authorization: `Bearer ${token}` }
-      }
-    );
-
-    const tracks = response.data.items
-      .map(item => formatTrack(item.track))
-      .filter(Boolean);
-
-    res.json({
-      tracks,
-      total: response.data.total,
-      limit,
-      offset
-    });
-
-  } catch (error) {
-    console.error('Playlist/Album tracks error:', error.response?.data || error.message);
-    res.status(500).json({ error: 'Failed to fetch tracks' });
-  }
-});
-
-// Recently played - returns user's actual recently played playlists
-router.get('/recently-played', auth, async (req, res) => {
-  try {
-    if (!req.user.hasSpotify) {
-      return res.status(400).json({ error: 'Spotify not connected' });
-    }
-
-    const token = await getValidSpotifyToken(req.user);
-    const playlists = await getUserRecentlyPlayedPlaylists(token);
-    res.json(playlists);
-    
-  } catch (error) {
-    console.error('Recently played error:', error.message);
-    res.json(mockPlaylists);
-  }
-});
-
-// Liked albums - returns playlists created from user's saved albums
-router.get('/liked-albums', auth, async (req, res) => {
-  try {
-    if (!req.user.hasSpotify) {
-      return res.status(400).json({ error: 'Spotify not connected' });
-    }
-
-    const token = await getValidSpotifyToken(req.user);
-    const playlists = await getUserLikedAlbumsPlaylists(token);
-    res.json(playlists);
-    
-  } catch (error) {
-    console.error('Liked albums error:', error.message);
-    res.json(mockPlaylists);
-  }
-});
-
-// Recommendations - returns personalized recommendations based on user's taste
-router.get('/recommendations', auth, async (req, res) => {
-  try {
-    if (!req.user.hasSpotify) return res.status(400).json({ error: 'Spotify not connected' });
-    const token = await getValidSpotifyToken(req.user);
-    const result = await getPersonalizedRecommendations(token);
-    res.json(result); // keep array format for consistency with your frontend
-  } catch (error) {
-    console.error('Recommendations error:', error.message);
-    res.json(mockPlaylists);
-  }
-});
-
-// Mood playlists - returns mood-based recommendations
-router.post('/mood-playlists', auth, async (req, res) => {
-  try {
-    const { mood } = req.body;
-    if (!req.user.hasSpotify) return res.status(400).json({ error: 'Spotify not connected' });
-    const token = await getValidSpotifyToken(req.user);
-    const result = await getMoodRecommendations(token, mood);
-    res.json(result);
-  } catch (error) {
-    console.error('Mood playlists error:', error.message);
-    res.json([mockPlaylists[0]]);
-  }
-});
-
-// Workload playlists - returns workload-based recommendations
-router.post('/workload-playlists', auth, async (req, res) => {
-  try {
-    const { workload } = req.body;
-    if (!req.user.hasSpotify) return res.status(400).json({ error: 'Spotify not connected' });
-    const token = await getValidSpotifyToken(req.user);
-    const result = await getWorkloadRecommendations(token, workload);
-    res.json(result);
-  } catch (error) {
-    console.error('Workload playlists error:', error.message);
-    res.json([mockPlaylists[0]]);
-  }
-});
-
 // Focus level playlists - returns focus-based recommendations
 router.post('/focus-playlists', auth, async (req, res) => {
   try {
@@ -902,61 +777,6 @@ router.post('/focus-playlists', auth, async (req, res) => {
       description: `Perfect for ${studyHours} hours of ${focusLevel} focus`
     };
     res.json([focusPlaylist]);
-  }
-});
-
-// Create real Spotify playlist from any virtual one
-router.post('/create-real-playlist', auth, async (req, res) => {
-  try {
-    const { playlistId, name } = req.body;
-    if (!req.user.hasSpotify) return res.status(400).json({ error: 'Spotify not connected' });
-
-    const token = await getValidSpotifyToken(req.user);
-    const userRes = await axios.get('https://api.spotify.com/v1/me', {
-      headers: { Authorization: `Bearer ${token}` }
-    });
-    const userId = userRes.data.id;
-
-    let fullTracks = [];
-
-    if (playlistId === 'personalized-recommendations') {
-      const rec = await getPersonalizedRecommendations(token);
-      fullTracks = rec[0].fullTracks;
-    } else if (playlistId.startsWith('mood-')) {
-      const mood = playlistId.replace('mood-', '');
-      const rec = await getMoodRecommendations(token, mood);
-      fullTracks = rec[0].fullTracks;
-    } else if (playlistId.startsWith('workload-')) {
-      const workload = playlistId.replace('workload-', '');
-      const rec = await getWorkloadRecommendations(token, workload);
-      fullTracks = rec[0].fullTracks;
-    }
-
-    if (!fullTracks || fullTracks.length === 0) {
-      return res.status(400).json({ error: 'No tracks found' });
-    }
-
-    const playlistName = name || 'StudySound • Focus Playlist';
-
-    const playlist = await axios.post(
-      `https://api.spotify.com/v1/users/${userId}/playlists`,
-      { name: playlistName, public: false, description: 'Created with StudySound' },
-      { headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' } }
-    );
-
-    const uris = fullTracks.map(t => t.uri);
-    for (let i = 0; i < uris.length; i += 100) {
-      await axios.post(
-        `https://api.spotify.com/v1/playlists/${playlist.data.id}/tracks`,
-        { uris: uris.slice(i, i + 100) },
-        { headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    res.json({ success: true, playlist: playlist.data });
-  } catch (error) {
-    console.error('Create playlist error:', error.response?.data || error.message);
-    res.status(500).json({ error: 'Failed to create playlist' });
   }
 });
 
