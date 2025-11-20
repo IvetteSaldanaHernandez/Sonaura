@@ -260,67 +260,6 @@
   background-color: #8c6bb1;
 }
 
-/* Responsive Design */
-@media (max-width: 768px) {
-  .playlist-view {
-    padding: 15px;
-  }
-  
-  .playlist-header {
-    flex-direction: column;
-    align-items: center;
-    text-align: center;
-    gap: 20px;
-  }
-  
-  .playlist-cover {
-    width: 150px;
-    height: 150px;
-  }
-  
-  .playlist-title {
-    font-size: 2em;
-  }
-  
-  .playlist-details {
-    grid-template-columns: 1fr;
-    gap: 30px;
-  }
-  
-  .stats-grid {
-    grid-template-columns: repeat(3, 1fr);
-  }
-}
-
-@media (max-width: 480px) {
-  .playlist-view {
-    padding: 10px;
-  }
-  
-  .playlist-cover {
-    width: 120px;
-    height: 120px;
-  }
-  
-  .playlist-title {
-    font-size: 1.6em;
-  }
-  
-  .track-item {
-    padding: 12px 15px;
-  }
-  
-  .stats-grid {
-    grid-template-columns: 1fr;
-    gap: 10px;
-  }
-  
-  .insight-card,
-  .playlist-stats {
-    padding: 20px;
-  }
-}
-
 /* Action Buttons */
 .action-buttons {
   margin-top: 20px;
@@ -330,7 +269,7 @@
   align-items: flex-start;
 }
 
-.save-to-spotify-btn {
+.open-spotify-btn {
   background: linear-gradient(135deg, #1db954, #1ed760);
   color: white;
   border: none;
@@ -348,76 +287,18 @@
   justify-content: center;
 }
 
-.save-to-spotify-btn:hover:not(:disabled) {
+.open-spotify-btn:hover {
   transform: translateY(-2px);
   box-shadow: 0 6px 16px rgba(29, 185, 84, 0.4);
   background: linear-gradient(135deg, #1ed760, #1db954);
 }
 
-.save-to-spotify-btn:active:not(:disabled) {
+.open-spotify-btn:active {
   transform: translateY(0);
-}
-
-.save-to-spotify-btn:disabled {
-  opacity: 0.7;
-  cursor: not-allowed;
-  transform: none;
-}
-
-.save-to-spotify-btn.saving {
-  background: linear-gradient(135deg, #b3b3b3, #999999);
-  box-shadow: 0 4px 12px rgba(179, 179, 179, 0.3);
 }
 
 .spotify-icon {
   font-size: 1.1em;
-}
-
-/* Spinner Animation */
-.spinner {
-  width: 16px;
-  height: 16px;
-  border: 2px solid transparent;
-  border-top: 2px solid white;
-  border-radius: 50%;
-  animation: spin 1s linear infinite;
-}
-
-@keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
-}
-
-/* Save Status Messages */
-.save-status {
-  padding: 8px 12px;
-  border-radius: 6px;
-  font-size: 0.9em;
-  font-weight: 500;
-  animation: fadeInUp 0.3s ease;
-}
-
-.save-status.success {
-  background-color: #e8f5e8;
-  color: #2e7d32;
-  border: 1px solid #c8e6c9;
-}
-
-.save-status.error {
-  background-color: #ffebee;
-  color: #c62828;
-  border: 1px solid #ffcdd2;
-}
-
-@keyframes fadeInUp {
-  from {
-    opacity: 0;
-    transform: translateY(10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
 }
 
 /* Spotify Info Section */
@@ -460,26 +341,10 @@
   gap: 8px;
 }
 
-/* Mood Indicator */
-.mood-indicator {
-  padding: 4px 12px;
-  border-radius: 20px;
-  font-size: 0.8em;
-  font-weight: 600;
-  color: #333;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-/* Responsive Design for Action Buttons */
+/* Responsive Design */
 @media (max-width: 768px) {
-  .action-buttons {
-    align-items: stretch;
-  }
-  
-  .save-to-spotify-btn {
-    width: 100%;
-    justify-content: center;
+  .playlist-view {
+    padding: 15px;
   }
   
   .playlist-header {
@@ -489,13 +354,63 @@
     gap: 20px;
   }
   
+  .playlist-cover {
+    width: 150px;
+    height: 150px;
+  }
+  
+  .playlist-title {
+    font-size: 2em;
+  }
+  
+  .playlist-details {
+    grid-template-columns: 1fr;
+    gap: 30px;
+  }
+  
+  .stats-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+  
   .action-buttons {
     align-items: center;
+  }
+  
+  .open-spotify-btn {
+    width: 100%;
+    justify-content: center;
   }
 }
 
 @media (max-width: 480px) {
-  .save-to-spotify-btn {
+  .playlist-view {
+    padding: 10px;
+  }
+  
+  .playlist-cover {
+    width: 120px;
+    height: 120px;
+  }
+  
+  .playlist-title {
+    font-size: 1.6em;
+  }
+  
+  .track-item {
+    padding: 12px 15px;
+  }
+  
+  .stats-grid {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+  
+  .insight-card,
+  .playlist-stats {
+    padding: 20px;
+  }
+  
+  .open-spotify-btn {
     padding: 10px 20px;
     font-size: 0.9em;
   }

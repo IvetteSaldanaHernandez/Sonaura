@@ -8,16 +8,16 @@ const router = express.Router();
 const mockPlaylists = [
   {
     id: 'mock-1',
-    title: "Deep Focus Study",
+    title: "study vibes 📝✨",
     artist: "Study Beats",
-    image: "https://images.unsplash.com/photo-1511379938547-c1f69419868d?w=300",
-    description: "Concentration enhancing tracks"
+    image: "https://image-cdn-ak.spotifycdn.com/image/ab67706c0000d72c891105886a4cf239fa460598",
+    description: "Minimal ambient sounds for intense concentration sessions"
   },
   {
     id: 'mock-2',
     title: "Lo-Fi Study Session",
     artist: "Chillhop Music",
-    image: "https://images.unsplash.com/photo-1571974599782-87624638275f?w=300",
+    image: "https://preview.redd.it/lofi-girl-changed-her-cat-why-v0-pkw275c61x3c1.jpg?width=640&crop=smart&auto=webp&s=5bc5032a7acaaf06e02a4307afe1c201fb885461",
     description: "Relaxing lo-fi beats for studying"
   },
   {

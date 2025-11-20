@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, NavLink } from 'react-router-dom';
+// import { useLocation } from 'react-router-dom';
 import './App.css';
 
 // Import components for other pages
@@ -17,7 +18,17 @@ import PlaylistView from './components/PlaylistView';
 
 const logoPath = '/Logo.png';
 
+// function useScrollToTop() {
+//   const { pathname } = useLocation();
+
+//   useEffect(() => {
+//     window.scrollTo(0, 0);
+//   }, [pathname]);
+// }
+
 function App() {
+  // useScrollToTop();
+
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
