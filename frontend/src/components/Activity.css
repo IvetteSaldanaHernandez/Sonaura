@@ -1,7 +1,7 @@
 .activity {
   background-color: #f6f3f7;
   padding: 20px;
-  max-width: 800px;
+  max-width: 1200px;
   margin: 0 auto;
   color: #333;
 }
@@ -20,36 +20,160 @@
 .playlist-cards {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 15px;
+  gap: 20px;
 }
 
 .playlist-card {
   background-color: #fff;
-  border-radius: 8px;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  border-radius: 12px;
+  box-shadow: 0 4px 8px rgba(0,0,0,0.1);
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  border: 1px solid #e5d9e6;
+}
+
+.playlist-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 16px rgba(0,0,0,0.15);
 }
 
 .card-image {
-  height: 100px;
-  background-color: #ccc;
+  height: 120px;
+  background-color: #e5d9e6;
   border-bottom: 1px solid #eee;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.image-placeholder {
+  font-size: 2em;
+  color: #a182cd;
+  opacity: 0.7;
 }
 
 .card-content {
-  padding: 10px;
+  padding: 15px;
+  flex-grow: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
 }
 
 .card-content h3 {
   font-size: 1em;
-  margin: 0 0 5px 0;
+  margin: 0 0 8px 0;
   color: #333;
+  font-weight: 600;
+  line-height: 1.3;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 .card-content p {
   font-size: 0.9em;
   color: #666;
   margin: 0;
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* Responsive Design */
+@media (max-width: 1024px) {
+  .playlist-cards {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 18px;
+  }
+}
+
+@media (max-width: 768px) {
+  .activity {
+    padding: 15px;
+  }
+  
+  .playlist-cards {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 15px;
+  }
+  
+  .card-image {
+    height: 100px;
+  }
+  
+  .card-content {
+    padding: 12px;
+  }
+}
+
+@media (max-width: 480px) {
+  .activity {
+    padding: 10px;
+  }
+  
+  .playlist-cards {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+  
+  .activity-section {
+    margin-bottom: 30px;
+  }
+  
+  .activity-section h2 {
+    font-size: 1.1em;
+    margin-bottom: 12px;
+  }
+  
+  .card-image {
+    height: 90px;
+  }
+  
+  .card-content {
+    padding: 10px;
+  }
+  
+  .card-content h3 {
+    font-size: 0.95em;
+  }
+  
+  .card-content p {
+    font-size: 0.85em;
+  }
+}
+
+/* Error Styling */
+.error {
+  background-color: #ffebee;
+  color: #c62828;
+  padding: 12px 16px;
+  border-radius: 8px;
+  margin-bottom: 20px;
+  border-left: 4px solid #c62828;
+}
+
+.error button {
+  background-color: #a182cd;
+  color: white;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.9em;
+  margin-left: 10px;
+}
+
+.error button:hover {
+  background-color: #8c6bb1;
 }

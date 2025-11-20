@@ -1,44 +1,386 @@
-/* src/components/Profile.css */
 .profile {
   background-color: #f6f3f7;
+  min-height: 100vh;
   padding: 20px;
-  max-width: 600px;
+  max-width: 800px;
   margin: 0 auto;
   color: #333;
 }
 
+.profile-header {
+  text-align: center;
+  margin-bottom: 40px;
+}
+
+.profile-header h1 {
+  font-size: 2.5em;
+  color: #333;
+  margin: 0 0 10px 0;
+  font-weight: 700;
+}
+
+.profile-subtitle {
+  color: #666;
+  font-size: 1.1em;
+  margin: 0;
+}
+
+.profile-content {
+  display: flex;
+  justify-content: center;
+}
+
+.profile-card {
+  background-color: white;
+  border-radius: 16px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+  padding: 30px;
+  width: 100%;
+  max-width: 600px;
+}
+
+.card-header {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  margin-bottom: 30px;
+  padding-bottom: 25px;
+  border-bottom: 2px solid #f0f0f0;
+}
+
+.user-avatar {
+  width: 80px;
+  height: 80px;
+  background: linear-gradient(135deg, #a182cd, #8c6bb1);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2em;
+  font-weight: 700;
+  color: white;
+  box-shadow: 0 4px 12px rgba(161, 130, 205, 0.3);
+}
+
+.user-info h2 {
+  margin: 0 0 8px 0;
+  font-size: 1.8em;
+  color: #333;
+  font-weight: 600;
+}
+
+.connection-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.95em;
+  font-weight: 500;
+  padding: 6px 12px;
+  border-radius: 20px;
+  background-color: #f8f9fa;
+}
+
+.connection-status.connected {
+  color: #1db954;
+}
+
+.connection-status.disconnected {
+  color: #666;
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.connection-status.connected .status-dot {
+  background-color: #1db954;
+}
+
+.connection-status.disconnected .status-dot {
+  background-color: #666;
+}
+
 .profile-details {
-  background-color: #fff;
-  padding: 15px;
+  margin-bottom: 30px;
+}
+
+.detail-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 15px 0;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.detail-item:last-child {
+  border-bottom: none;
+}
+
+.detail-label {
+  font-weight: 600;
+  color: #666;
+}
+
+.detail-value {
+  font-weight: 500;
+  color: #333;
+}
+
+.detail-value.connected {
+  color: #1db954;
+  font-weight: 600;
+}
+
+.detail-value.disconnected {
+  color: #666;
+}
+
+/* Success and Error Messages */
+.success-message {
+  background: linear-gradient(135deg, #e8f5e8, #c8e6c9);
+  border: 1px solid #c8e6c9;
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 25px;
+  display: flex;
+  align-items: flex-start;
+  gap: 15px;
+}
+
+.success-icon {
+  font-size: 1.2em;
+  flex-shrink: 0;
+}
+
+.success-content p {
+  margin: 0 0 12px 0;
+  color: #2e7d32;
+  font-weight: 500;
+}
+
+.error-message {
+  background: linear-gradient(135deg, #ffebee, #ffcdd2);
+  border: 1px solid #ffcdd2;
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 25px;
+  display: flex;
+  align-items: flex-start;
+  gap: 15px;
+}
+
+.error-icon {
+  font-size: 1.2em;
+  flex-shrink: 0;
+}
+
+.error-message p {
+  margin: 0;
+  color: #c62828;
+  font-weight: 500;
+}
+
+/* Spotify Section */
+.spotify-section {
+  background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+  border-radius: 12px;
+  padding: 25px;
+  margin-top: 20px;
+  text-align: center;
+}
+
+.spotify-info h3 {
+  margin: 0 0 15px 0;
+  color: #333;
+  font-size: 1.3em;
+}
+
+.spotify-info p {
+  margin: 0 0 20px 0;
+  color: #666;
+  line-height: 1.5;
+}
+
+.benefits-list {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 25px 0;
+  text-align: left;
+}
+
+.benefits-list li {
+  padding: 8px 0;
+  color: #555;
+  font-size: 0.95em;
+}
+
+.spotify-connect-btn {
+  background: linear-gradient(135deg, #1db954, #1ed760);
+  color: white;
+  border: none;
+  padding: 15px 30px;
+  border-radius: 50px;
+  font-weight: 600;
+  font-size: 1em;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  box-shadow: 0 4px 15px rgba(29, 185, 84, 0.3);
+}
+
+.spotify-connect-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(29, 185, 84, 0.4);
+  background: linear-gradient(135deg, #1ed760, #1db954);
+}
+
+.spotify-icon {
+  font-size: 1.2em;
+}
+
+/* Connected Features */
+.connected-features {
+  background: linear-gradient(135deg, #e8f5e8, #c8e6c9);
+  border-radius: 12px;
+  padding: 25px;
+  margin-top: 20px;
+}
+
+.connected-features h3 {
+  margin: 0 0 10px 0;
+  color: #2e7d32;
+  font-size: 1.3em;
+}
+
+.connected-features p {
+  margin: 0 0 20px 0;
+  color: #555;
+}
+
+.features-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 15px;
+}
+
+.feature {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px;
+  background-color: white;
   border-radius: 8px;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  font-size: 0.9em;
+  font-weight: 500;
+}
+
+.feature-icon {
+  font-size: 1.2em;
+}
+
+.home-button {
+  background-color: #a182cd;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+}
+
+.home-button:hover {
+  background-color: #8c6bb1;
+}
+
+/* Loading State */
+.profile-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 20px;
+  text-align: center;
+}
+
+.loading-spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid #f3f3f3;
+  border-top: 4px solid #a182cd;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
   margin-bottom: 20px;
 }
 
-.profile-details p {
-  font-size: 1em;
-  margin: 5px 0;
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
 }
 
-.profile-details strong {
-  color: #a182cd;
+/* Responsive Design */
+@media (max-width: 768px) {
+  .profile {
+    padding: 15px;
+  }
+
+  .profile-header h1 {
+    font-size: 2em;
+  }
+
+  .profile-card {
+    padding: 20px;
+  }
+
+  .card-header {
+    flex-direction: column;
+    text-align: center;
+    gap: 15px;
+  }
+
+  .user-avatar {
+    width: 70px;
+    height: 70px;
+    font-size: 1.5em;
+  }
+
+  .features-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .detail-item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 5px;
+  }
+
+  .success-message,
+  .error-message {
+    flex-direction: column;
+    text-align: center;
+    gap: 10px;
+  }
 }
 
-.spotify-connect {
-  display: block;
-  width: 100%;
-  max-width: 200px;
-  padding: 10px;
-  font-size: 1em;
-  background-color: #1db954; /* Spotify green */
-  color: #fff;
-  border: none;
-  border-radius: 8px;
-  cursor: pointer;
-  transition: background-color 0.2s;
-  margin: 0 auto;
-}
+@media (max-width: 480px) {
+  .profile {
+    padding: 10px;
+  }
 
-.spotify-connect:hover {
-  background-color: #1ed760;
+  .profile-card {
+    padding: 15px;
+  }
+
+  .spotify-connect-btn {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .user-info h2 {
+    font-size: 1.5em;
+  }
 }
